@@ -164,19 +164,24 @@ class DecordInit(object):
 class DogDataset(torch.utils.data.Dataset):
 	"""Load the Dog Video Files"""
 	def __init__(self,
-				 configs,
 				 annotation_path,
+				 num_frames=16,
+				 num_samples_per_cls=60,
+				 num_class=2,
 				 transform=None,
 				 temporal_sample=None):
-		self.configs = configs
+		#self.configs = configs
+		self.num_class=num_class
+		self.num_frames=num_frames
+		self.num_samples_per_cls=num_samples_per_cls
 		self.annotation_path = annotation_path
-		self.data = load_annotations_dog(self.annotation_path, self.configs.num_class, self.configs.num_samples_per_cls)
+		self.data = load_annotations_dog(self.annotation_path, self.num_class, self.num_samples_per_cls)
 
 
 		self.transform = transform
 		self.temporal_sample = temporal_sample
-		self.target_video_len = self.configs.num_frames
-		#self.objective = self.configs.objective
+		self.target_video_len = self.num_frames
+
 		self.v_decoder = DecordInit()
 	def __getitem__(self, index):
 		curr_path=os.path.dirname(self.annotation_path)

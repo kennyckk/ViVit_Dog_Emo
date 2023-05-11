@@ -1,12 +1,12 @@
 import os
 from torch import optim, nn, utils, Tensor
-import pytorch_lightning as pl
+import lightning.pytorch as pl
+from lightning.pytorch import Trainer, seed_everything
 import torch
 
 from video_transformer import ViViT
 from transformer import ClassificationHead
-
-device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from data_trainer import DogDataModule
 
 pretrain_pth='./vivit_model.pth'
 num_class=2
@@ -35,7 +35,7 @@ class FineTuneViVit(pl.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=0.005) #temporary for now
         return optimizer
 
-#def load_Dataloader():
+
 
 
 if __name__ =="__main__":
@@ -47,8 +47,20 @@ if __name__ =="__main__":
     # initialize Classhead and load in pretrian file
     cls_head = ClassificationHead(num_classes=num_class, in_channels=768)
 
+    # initiate Model Trainer
     finetuner=FineTuneViVit(model, cls_head)
+    #print(finetuner)
 
-    print(finetuner)
+    # intialize DataModule
+    dm= DogDataModule(batch_size=4,
+                      num_workers=0,
+                      train_ann_path='./data/train.csv',
+                      val_ann_path='./data/eval.csv'
+                      )
 
+    trainer=Trainer(devices='auto',
+                    accelerator='auto',
+                    max_epochs=1)
+
+    trainer.fit(finetuner,dm)
 
