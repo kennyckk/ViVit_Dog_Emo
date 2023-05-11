@@ -8,10 +8,8 @@ from video_transformer import ViViT
 from transformer import ClassificationHead
 from data_trainer import DogDataModule
 
-pretrain_pth='./vivit_model.pth'
+pretrain_pth='/content/drive/MyDrive/ViViT_Weight/vivit_model.pth' #for google collab testing
 num_class=2
-
-
 
 class FineTuneViVit(pl.LightningModule):
     def __init__(self, model, cls_head):
@@ -28,8 +26,19 @@ class FineTuneViVit(pl.LightningModule):
         preds = self.cls_head(preds)
         loss = nn.CrossEntropyLoss()(preds, labels)
         # Logging to TensorBoard (if installed) by default
-        self.log("train_loss", loss)
+        self.log("train_loss", loss,prog_bar=True)
         return loss
+
+    def validation_step(self, batch, batch_idx):
+        # this is the validation loop
+        inputs, labels = batch # input already are (T C H W)
+
+        preds = self.model(inputs)
+        preds = self.cls_head(preds)
+        val_loss = nn.CrossEntropyLoss()(preds, labels)
+
+        self.log("val_loss" , val_loss,prog_bar=True)
+
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=0.005) #temporary for now
@@ -52,15 +61,17 @@ if __name__ =="__main__":
     #print(finetuner)
 
     # intialize DataModule
-    dm= DogDataModule(batch_size=4,
+    dm= DogDataModule(batch_size=2,
                       num_workers=0,
-                      train_ann_path='./data/train.csv',
-                      val_ann_path='./data/eval.csv'
+                      train_ann_path='/content/drive/MyDrive/dogdata/train.csv',
+                      val_ann_path='/content/drive/MyDrive/dogdata/eval.csv'
                       )
 
     trainer=Trainer(devices='auto',
                     accelerator='auto',
-                    max_epochs=1)
+                    max_epochs=20,
+                    log_every_n_steps=10,
+                    check_val_every_n_epoch=1)
 
     trainer.fit(finetuner,dm)
 
