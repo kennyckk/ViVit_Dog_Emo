@@ -1,0 +1,5 @@
+__pycache__/
+notebook/.ipynb_checkpoints/
+vivit_model.pth
+.idea/
+data/videos
