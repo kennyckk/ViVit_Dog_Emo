@@ -53,7 +53,7 @@ class FineTuneViVit(pl.LightningModule):
 
         #cal accuracy
         acc=self.accuracy(preds=preds,target=labels)
-        self.log('accuracy',acc,prog_bar=True)
+        self.log('val_accuracy',acc,prog_bar=True)
         self.log('val_loss',val_loss,prog_bar=True)
 
 
@@ -87,14 +87,13 @@ if __name__ =="__main__":
                     max_epochs=10,
                     log_every_n_steps=1,
                     check_val_every_n_epoch=1,
-                    callbacks=[checkpoint_callback],
-                    default_root_dir="./check_pt/")
+                    callbacks=[checkpoint_callback],)
 
     trainer.fit(finetuner,dm)
 
 #to add
 # grad clip
 # lr scheduler
-# model save
+# model save done --> load model
 # Accuracy-done
 #Early Stop
