@@ -92,7 +92,7 @@ def load_DataLoader(train_dataset, val_dataset, batch_size, num_worker=0):
     return train_DataLoader, val_DataLoader
 
 
-def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path, step_log=10):
+def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10):
     # may add accelerator ....
 
     progress_bar = tqdm(range(epochs * len(train_loader)))
@@ -112,6 +112,10 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             # BP and optimize
             optimizer.zero_grad()
             loss.backward()
+            #to clip the parameters grad by values
+            if clip_value>0:
+                utils.clip_grad_value_(model.parameters(),clip_value)
+            # update parameters
             optimizer.step()
 
             # calculate metrices
@@ -160,8 +164,10 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 
 
 if __name__ == "__main__":
-
+    # to add in parser for hyperparameters
     ep=10
+    clip_value=1 # 0 for disabling grad clip by value
+
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth')
@@ -184,5 +190,5 @@ if __name__ == "__main__":
     os.makedirs(PATH,exist_ok=True)
 
     #Finetuning for the Vivit Classifier for Dog video emotions
-    training_loop(model, train_DataLoader, val_DataLoader, ep, optimizer,lr_sched, criterion, PATH, step_log=5)
+    training_loop(model, train_DataLoader, val_DataLoader, ep, optimizer,lr_sched, criterion, PATH,clip_value, step_log=5)
 
