@@ -1,5 +1,6 @@
 torch
 lightning
+torchmetrics
 torchtext
 pytorchvideo
 scikit-image
