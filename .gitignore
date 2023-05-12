@@ -5,3 +5,4 @@ vivit_model.pth
 data/videos
 test.py
 lightning_logs/
+saved_model/

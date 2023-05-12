@@ -11,14 +11,15 @@ from data_transform import create_video_transform, TemporalRandomCrop
 from dataset import DogDataset
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+print(device)
 
 # Function to load in model
-def load_model(pretrain_pth, num_class=2):
+def load_model(pretrain_pth, num_class=2,drop_out=0.3):
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from='kinetics',
                   img_size=224,
                   num_frames=16,
-                  attention_type='fact_encoder')
+                  attention_type='fact_encoder',
+                  dropout_p=drop_out)
 
     cls_head = ClassificationHead(num_classes=num_class, in_channels=768)
 
@@ -126,15 +127,16 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             lr_sched.step()
             # Monitor Progress
             if step % step_log == 0:  # print accuracy and loss every 10 steps
+                print("current progress are ep{}: {}/{}".format(ep,step+1,len(train_loader)))
                 print("the training loss for this batch:{}".format(batch_loss))
                 print("the training accuracy for this batch: {}".format(batch_correct / labels.size(0)))
             progress_bar.update(1)
 
         # Save model and monitor result for this ep
         print(" epoch{}: average accuracy:{}; total loss:{}".format(ep + 1, train_correct / train_total, total_loss))
-        save_path = os.path.join(save_path, "ep{}_saved".format(ep + 1))
-        torch.save(model.state_dict(), save_path)
-        print('Model saved in {}'.format(save_path))
+        saved_path=os.path.join(save_path, "ep{}_saved".format(ep + 1))
+        torch.save(model.state_dict(), saved_path)
+        print('Model saved in {}'.format(saved_path))
 
         # to do eval per epoch end
         print("Evaluation for ep{} start!".format(ep + 1))
@@ -167,7 +169,7 @@ if __name__ == "__main__":
     train_dataset, val_dataset = load_dataset('./data/train.csv',
                                               './data/eval.csv')
     # load them to Data Loader
-    train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 8)
+    train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 4)
 
     #define optimizer and loss function
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
