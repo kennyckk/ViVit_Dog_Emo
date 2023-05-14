@@ -7,7 +7,7 @@ from tqdm.auto import tqdm
 
 from video_transformer import ViViT
 from transformer import ClassificationHead
-from data_transform import create_video_transform, TemporalRandomCrop
+from data_transform import create_video_transform, TemporalRandomCrop,transforms_train_dog,transforms_eval
 from dataset import DogDataset
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -36,7 +36,9 @@ def load_dataset(
         img_size=224,
         auto_augment=None,
         num_frames=16,
-        frame_interval=16):
+        frame_interval=16,
+        hflip=0.8,
+        ):
     color_jitter = 0.4
     scale = None
 
@@ -52,17 +54,16 @@ def load_dataset(
     temporal_sample = TemporalRandomCrop(
         num_frames * frame_interval)
 
-    train_transform = create_video_transform(
-        objective=objective,
-        input_size=img_size,
-        is_training=True,
-        scale=scale,
-        hflip=0.5,
-        color_jitter=color_jitter,
-        auto_augment=auto_augment,
-        interpolation='bicubic',
-        mean=mean,
-        std=std)
+    train_transform = transforms_train_dog(img_size=img_size,
+                    augmentation=True,
+					crop_pct=None,
+					 hflip=hflip, # 0 for non-augment data
+					 color_jitter=color_jitter,
+					 auto_augment=auto_augment,
+					 interpolation='bicubic',
+					 mean=mean,
+					 std=std,)
+    # to implement additional augmentation
 
     val_transform = create_video_transform(
         input_size=img_size,

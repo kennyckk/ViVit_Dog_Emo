@@ -335,6 +335,21 @@ class Normalize(object):
 		pass
 
 
+class AddNoise(object):
+
+	def __init__(self, prob,mean=0, std=1): # gaussian noise distribution
+		self.mean=mean
+		self.std=std
+		self.prob=prob
+
+	def __call__ (self,img):
+		size=img.size()
+		rand= np.random.random()
+		return img+ torch.randn(size)*self.std+self.mean if self.prob>rand else img
+
+	def __repr__(self) -> str:
+		return self.__class__.__name__+"(mean={},std={})".format(self.mean,self.std)
+		
 class ColorJitter(object):
 	"""Randomly distort the brightness, contrast, saturation and hue of images.
 
@@ -542,6 +557,73 @@ def transforms_train(img_size=224,
 	else:
 		return Compose(primary_tfl + secondary_tfl + final_tfl)
 
+def transforms_train_dog(img_size=224,
+					augmentation=False,
+					crop_pct=None,
+					 scale=None,
+					 ratio=None,
+					 hflip=0.8, # 0 for non-augment data
+					 color_jitter=0.4,
+					 auto_augment=None,
+					 interpolation='random',
+					 mean=IMAGENET_DEFAULT_MEAN,
+					 std=IMAGENET_DEFAULT_STD,
+					 noise=0.2
+					 ):
+	"""
+	If separate==True, the transforms are returned as a tuple of 3 separate transforms
+	for use in a mixing dataset that passes
+	 * all data through the first (primary) transform, called the 'clean' data
+	 * a portion of the data through the secondary transform
+	 * normalizes and converts the branches above with the third, final transform
+	"""
+	#scale = tuple(scale or (0.08, 1.0))  # default imagenet scale range
+	#ratio = tuple(ratio or (3./4., 4./3.))  # default imagenet ratio range
+
+	crop_pct = crop_pct or DEFAULT_CROP_PCT # for resize transform
+	scale_size = int(math.floor(img_size / crop_pct))  #output a turple//scale to magnify abit
+
+	primary_tfl=[transforms.Resize(scale_size, interpolation=str_to_interp_mode(interpolation)),
+				transforms.CenterCrop(img_size)]
+	#secondary tfl to include augmentation operation
+	secondary_tfl = []
+	
+	if augmentation:
+		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
+		### to add rotation or noise addition
+		secondary_tfl+=[transforms.RandomRotation((0,360))] #rotation 
+		# add Gausian Noise
+		secondary_tfl+=[AddNoise(prob=noise)]
+
+
+	# either auto augment or color jitter applied
+	if auto_augment:
+		secondary_tfl += [transforms.autoaugment.RandAugment()]
+	elif color_jitter is not None:
+		# color jitter is enabled when not using AA
+		if isinstance(color_jitter, (list, tuple)):
+			# color jitter should be a 3-tuple/list if spec brightness/contrast/saturation
+			# or 4 if also augmenting hue
+			assert len(color_jitter) in (3, 4)
+		else:
+			# if it's a scalar, duplicate for brightness, contrast, and saturation, no hue
+			color_jitter = (float(color_jitter),) * 3
+		secondary_tfl += [transforms.ColorJitter(*color_jitter)]
+
+	final_tfl = []
+	final_tfl += [
+		ToTensor(),
+		transforms.Normalize(
+			mean=torch.tensor(mean),
+			std=torch.tensor(std))
+	]
+	#if objective == 'mim':
+		#return [Compose(primary_tfl + secondary_tfl), Compose(final_tfl)]
+	
+	return Compose(primary_tfl + secondary_tfl + final_tfl)
+
+
+
 
 def transforms_eval(img_size=224,
 					crop_pct=None,
@@ -578,7 +660,7 @@ def create_video_transform(input_size=224,
 						   is_training=False,
 						   scale=None,
 						   ratio=None,
-						   hflip=0.5,
+						   hflip=0.8,
 						   color_jitter=0.4,
 						   auto_augment=None,
 						   interpolation='bilinear',
