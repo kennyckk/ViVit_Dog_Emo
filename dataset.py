@@ -99,9 +99,9 @@ def load_annotations_dog(ann_file, num_class, num_samples_per_cls): # the anotat
 		# choose a class subset of whole dataset
 		if class_index < num_class:
 			sample['label'] = class_index
-			if cls_sample_cnt[class_idx] < num_samples_per_cls:
-				dataset.append(sample)
-				cls_sample_cnt[class_idx] += 1
+			#if cls_sample_cnt[class_idx] < num_samples_per_cls:
+			dataset.append(sample)
+			cls_sample_cnt[class_idx] += 1
 
 	return dataset
 
@@ -386,3 +386,31 @@ class Kinetics(torch.utils.data.Dataset):
 	#from skimage import io
 	#io.imsave('./test_img_hog.jpg',hog_image)
 	#show_processed_image(video.permute(0,2,3,1), save_dir='./')
+
+#just a unit test to show the image of the transformed image
+if __name__=="__main__":
+	import data_transform as T
+	from utils import show_processed_image
+
+	train_temporal_sample = T.TemporalRandomCrop(
+    16 * 16)
+
+	aug_transform= T.transforms_train_dog(img_size=224,
+                    augmentation=True,
+					crop_pct=None,
+					 hflip=0.6, # 0 for non-augment data
+					 auto_augment=None,
+					 interpolation='bicubic',
+					 rotate=1,
+					 noise=1
+					 )
+
+	sample_videos=DogDataset('./data/train.csv',
+				 num_frames=16,
+				 num_samples_per_cls=60,
+				 num_class=2,
+				 transform=aug_transform,
+				 temporal_sample=train_temporal_sample)
+
+	sample=next(iter(sample_videos))[0]
+	show_processed_image(sample.permute(0,2,3,1),'./dummies/',mean=(0.45, 0.45, 0.45),std=(0.225, 0.225, 0.225))

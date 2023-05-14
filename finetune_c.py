@@ -55,7 +55,7 @@ def load_dataset(
         num_frames * frame_interval)
 
     train_transform = transforms_train_dog(img_size=img_size,
-                    augmentation=True,
+                    augmentation=False,
 					crop_pct=None,
 					 hflip=hflip, # 0 for non-augment data
 					 color_jitter=color_jitter,
@@ -64,6 +64,15 @@ def load_dataset(
 					 mean=mean,
 					 std=std,)
     # to implement additional augmentation
+    aug_train_transform= transforms_train_dog(img_size=img_size,
+                    augmentation=True,
+					crop_pct=None,
+					 hflip=hflip, # 0 for non-augment data
+					 color_jitter=color_jitter,
+					 auto_augment=auto_augment,
+					 interpolation='bicubic',
+					 mean=mean,
+					 std=std,)
 
     val_transform = create_video_transform(
         input_size=img_size,

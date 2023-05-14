@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 import random
 import math
+import scipy
 
 from einops import rearrange
 import numpy as np
@@ -486,16 +487,22 @@ class ThreeCrop(object):
 #custom random rotation with probability
 class Custom_Rotation(object):
 	def __init__(self, degree:tuple, prob=0.3):
-		self.degree=random.randint(degree[0],degree[1])
+		#self.degree=random.randint(degree[0],degree[1])
+		self.low,self.high=degree
 		self.prob=prob
 
 	def __call__(self, video):
+		
+		deg=self.get_norm_degree(self.high,self.low,(self.high+self.low)/2,30)
+		sample_angle=deg.rvs()
+		print(sample_angle)
 		if self.prob>=np.random.random():
-			return transforms.functional.rotate(video,self.degree)
+			return transforms.functional.rotate(video,sample_angle,)
 		else:
 			return video
 
-
+	def get_norm_degree(self,high,low,mean,sd):
+		return scipy.stats.truncnorm((low-mean)/sd,(high-mean)/sd,loc=mean,scale=sd)
 #  ------------------------------------------------------------
 #  ---------------------  Sampling  ---------------------------
 #  ------------------------------------------------------------
@@ -596,17 +603,18 @@ def transforms_train_dog(img_size=224,
 	crop_pct = crop_pct or DEFAULT_CROP_PCT # for resize transform
 	scale_size = int(math.floor(img_size / crop_pct))  #output a turple//scale to magnify abit
 
-	primary_tfl=[transforms.Resize(scale_size, interpolation=str_to_interp_mode(interpolation)),
-				transforms.CenterCrop(img_size)]
+	primary_tfl=[transforms.Resize(scale_size, interpolation=str_to_interp_mode(interpolation)),]
 	#secondary tfl to include augmentation operation
 	secondary_tfl = []
 	
 	if augmentation:
-		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
-		### to add rotation or noise addition
-		secondary_tfl+=[Custom_Rotation((0,360),prob=rotate)] #rotation 
 		# add Gausian Noise
 		secondary_tfl+=[AddNoise(prob=noise)]
+		# add flip 
+		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
+		### to add rotation or noise addition
+		secondary_tfl+=[Custom_Rotation((-180,180),prob=rotate)] #rotation 
+		
 
 
 	# either auto augment or color jitter applied
@@ -622,6 +630,9 @@ def transforms_train_dog(img_size=224,
 			# if it's a scalar, duplicate for brightness, contrast, and saturation, no hue
 			color_jitter = (float(color_jitter),) * 3
 		secondary_tfl += [transforms.ColorJitter(*color_jitter)]
+
+	# center crop as necessary step to crop image 
+	secondary_tfl+=[transforms.CenterCrop(img_size)]
 
 	final_tfl = []
 	final_tfl += [
