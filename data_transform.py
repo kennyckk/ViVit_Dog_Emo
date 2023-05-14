@@ -483,6 +483,18 @@ class ThreeCrop(object):
 	def randomize_parameters(self):
 		pass
 
+#custom random rotation with probability
+class Custom_Rotation(object):
+	def __init__(self, degree:tuple, prob=0.3):
+		self.degree=random.randint(degree[0],degree[1])
+		self.prob=prob
+
+	def __call__(self, video):
+		if self.prob>=np.random.random():
+			return transforms.functional.rotate(video,self.degree)
+		else:
+			return video
+
 
 #  ------------------------------------------------------------
 #  ---------------------  Sampling  ---------------------------
@@ -568,7 +580,8 @@ def transforms_train_dog(img_size=224,
 					 interpolation='random',
 					 mean=IMAGENET_DEFAULT_MEAN,
 					 std=IMAGENET_DEFAULT_STD,
-					 noise=0.2
+					 noise=0.2,
+					 rotate=0.3
 					 ):
 	"""
 	If separate==True, the transforms are returned as a tuple of 3 separate transforms
@@ -591,7 +604,7 @@ def transforms_train_dog(img_size=224,
 	if augmentation:
 		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
 		### to add rotation or noise addition
-		secondary_tfl+=[transforms.RandomRotation((0,360))] #rotation 
+		secondary_tfl+=[Custom_Rotation((0,360),prob=rotate)] #rotation 
 		# add Gausian Noise
 		secondary_tfl+=[AddNoise(prob=noise)]
 
