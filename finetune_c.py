@@ -114,7 +114,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             loss.backward()
             #to clip the parameters grad by values
             if clip_value>0:
-                utils.clip_grad_value_(model.parameters(),clip_value)
+                nn.utils.clip_grad_value_(model.parameters(),clip_value)
             # update parameters
             optimizer.step()
 
