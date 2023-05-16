@@ -4,6 +4,7 @@ import math
 import scipy
 
 from einops import rearrange
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -338,18 +339,50 @@ class Normalize(object):
 
 class AddNoise(object):
 
-	def __init__(self, prob,mean=0, std=1): # gaussian noise distribution
+	def __init__(self, prob,mean=0.45, var=0.225): # gaussian noise distribution
 		self.mean=mean
-		self.std=std
+		self.var=var
 		self.prob=prob
 
 	def __call__ (self,img):
-		size=img.size()
-		rand= np.random.random()
-		return img+ torch.randn(size)*self.std+self.mean if self.prob>rand else img
+		if self.prob>=np.random.random():
+			
+			# plt.imshow(img.detach().permute(0,2,3,1)[0])
+			# plt.show()
+
+			dtype= img.dtype
+			#before=img.detach()
+
+			#img=img.to(torch.float32)			
+
+			noise=np.random.normal(loc=0,scale=1,size=img.size())
+			noise=25*torch.from_numpy(noise)
+			#print(noise)
+			# plt.imshow(noise.detach().permute(0,2,3,1)[0])
+			# plt.show()
+
+			img= img+noise*self.var+self.mean #adding noise with value expected from before normalize
+			
+			#clip value to 255
+			#print("the number of clipped noise is{} ".format(torch.sum(img>255)))
+			#print("the number of clipped noise is{} ".format(torch.sum(img<0)))
+			img[img>255]=255
+			img[img<0]=0
+
+			img=img.to(dtype)
+
+			#print(torch.sum(before!=img).item())
+
+			#sample=img.detach().permute(0,2,3,1)[0]
+			# plt.imshow(sample)
+			# plt.show()
+
+			return img
+		else:
+			return img
 
 	def __repr__(self) -> str:
-		return self.__class__.__name__+"(mean={},std={})".format(self.mean,self.std)
+		return self.__class__.__name__+"(mean={},std={})".format(self.mean,self.var)
 		
 class ColorJitter(object):
 	"""Randomly distort the brightness, contrast, saturation and hue of images.
@@ -612,7 +645,7 @@ def transforms_train_dog(img_size=224,
 		secondary_tfl+=[AddNoise(prob=noise)]
 		# add flip 
 		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
-		### to add rotation or noise addition
+		### to add rotation 
 		secondary_tfl+=[Custom_Rotation((-180,180),prob=rotate)] #rotation 
 		
 
