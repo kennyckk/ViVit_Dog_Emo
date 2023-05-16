@@ -528,7 +528,7 @@ class Custom_Rotation(object):
 		
 		deg=self.get_norm_degree(self.high,self.low,(self.high+self.low)/2,30)
 		sample_angle=deg.rvs()
-		print(sample_angle)
+		#print(sample_angle)
 		if self.prob>=np.random.random():
 			return transforms.functional.rotate(video,sample_angle,)
 		else:

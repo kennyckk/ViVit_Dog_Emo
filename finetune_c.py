@@ -27,10 +27,21 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.3):
     return model.to(device)
 
 
+def concat_train_dataset(train_dataset,aug_size,aug_transform,temporal_sample,path):
+    #prepare list for all training data
+    train_list=[train_dataset]
+    #instantiate multiple dataset object with augmented data
+    for _ in range(aug_size):
+            aug_train_dataset = DogDataset(path, transform=aug_transform, temporal_sample=temporal_sample)
+            train_list.append(aug_train_dataset)
+
+    return utils.data.ConcatDataset(train_list)
+
 # load the dataset for Dataloader later on
 def load_dataset(
         train_ann_path,
         val_ann_path,
+        aug_size=1,
         data_statics='kinetics',
         objective='supervised',
         img_size=224,
@@ -56,23 +67,29 @@ def load_dataset(
 
     train_transform = transforms_train_dog(img_size=img_size,
                     augmentation=False,
-					crop_pct=None,
-					 hflip=hflip, # 0 for non-augment data
+                    crop_pct=None,
 					 color_jitter=color_jitter,
 					 auto_augment=auto_augment,
 					 interpolation='bicubic',
 					 mean=mean,
 					 std=std,)
+    train_dataset = DogDataset(train_ann_path, transform=train_transform, temporal_sample=temporal_sample)
     # to implement additional augmentation
-    aug_train_transform= transforms_train_dog(img_size=img_size,
-                    augmentation=True,
-					crop_pct=None,
-					 hflip=hflip, # 0 for non-augment data
-					 color_jitter=color_jitter,
-					 auto_augment=auto_augment,
-					 interpolation='bicubic',
-					 mean=mean,
-					 std=std,)
+    if aug_size>0:
+        
+        #prepare augmentation transform
+        aug_train_transform= transforms_train_dog(img_size=img_size,
+                        augmentation=True,
+                        crop_pct=None,
+                        hflip=hflip, # 0 for non-augment data
+                        color_jitter=color_jitter,
+                        auto_augment=auto_augment,
+                        interpolation='bicubic',
+                        mean=mean,
+                        std=std,)
+        
+        train_dataset=concat_train_dataset(train_dataset,aug_size,aug_train_transform,temporal_sample,train_ann_path)
+
 
     val_transform = create_video_transform(
         input_size=img_size,
@@ -82,9 +99,8 @@ def load_dataset(
         std=std)
 
     # use the dataset class to load in DAtaset Obj
-    train_dataset = DogDataset(train_ann_path, transform=train_transform, temporal_sample=temporal_sample)
     val_dataset = DogDataset(val_ann_path, transform=val_transform, temporal_sample=temporal_sample)
-    # will further add the augment step here
+    
 
     return train_dataset, val_dataset
 
@@ -191,7 +207,7 @@ if __name__ == "__main__":
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
     #
     optimizer = optim.SGD(model.parameters(), momentum=0.9, nesterov=True,
-                          lr=0.005, weight_decay=0.05)
+                          lr=0.0005, weight_decay=0.05)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
