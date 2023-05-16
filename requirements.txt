@@ -11,3 +11,4 @@ kornia==0.6.1
 matplotlib==3.4.3
 timm==0.4.12
 pandas
+scikit-learn
