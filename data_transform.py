@@ -536,6 +536,55 @@ class Custom_Rotation(object):
 
 	def get_norm_degree(self,high,low,mean,sd):
 		return scipy.stats.truncnorm((low-mean)/sd,(high-mean)/sd,loc=mean,scale=sd)
+
+#Add noise after normalization
+class afterNorm_Noise(object):
+
+	def __init__(self, prob,mean=0, var=1): # gaussian noise distribution
+		self.mean=mean
+		self.var=var
+		self.prob=prob
+
+	def __call__ (self,img):
+		if self.prob>=np.random.random():
+			
+			# plt.imshow(img.detach().permute(0,2,3,1)[0])
+			# plt.show()
+
+			dtype= img.dtype
+			#before=img.detach()
+
+			#img=img.to(torch.float32)			
+
+			noise=np.random.normal(loc=0,scale=1,size=img.size())
+			noise=torch.from_numpy(noise)
+			print(noise)
+			plt.imshow(noise.detach().permute(0,2,3,1)[0])
+			plt.show()
+
+			img= img+noise*self.var+self.mean #adding noise with value expected from before normalize
+			
+			#clip value to 255
+			print("the number of clipped noise is{} ".format(torch.sum(img>1)))
+			print("the number of clipped noise is{} ".format(torch.sum(img<0)))
+			#img[img>1]=1
+			#img[img<0]=0
+
+			img=img.to(dtype)
+
+			#print(torch.sum(before!=img).item())
+
+			sample=img.detach().permute(0,2,3,1)[0]
+			print(sample)
+			plt.imshow(sample)
+			plt.show()
+
+			return img
+		else:
+			return img
+
+	def __repr__(self) -> str:
+		return self.__class__.__name__+"(mean={},std={})".format(self.mean,self.var)
 #  ------------------------------------------------------------
 #  ---------------------  Sampling  ---------------------------
 #  ------------------------------------------------------------
@@ -642,7 +691,7 @@ def transforms_train_dog(img_size=224,
 	
 	if augmentation:
 		# add Gausian Noise
-		secondary_tfl+=[AddNoise(prob=noise)]
+		#secondary_tfl+=[AddNoise(prob=noise)]
 		# add flip 
 		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
 		### to add rotation 
@@ -674,6 +723,8 @@ def transforms_train_dog(img_size=224,
 			mean=torch.tensor(mean),
 			std=torch.tensor(std))
 	]
+	#adding noise after norm better
+	final_tfl+=[afterNorm_Noise(noise,mean=0.45, var=0.225)]
 	#if objective == 'mim':
 		#return [Compose(primary_tfl + secondary_tfl), Compose(final_tfl)]
 	

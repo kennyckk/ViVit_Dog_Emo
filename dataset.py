@@ -405,7 +405,7 @@ if __name__=="__main__":
 					 noise=1
 					 )
 
-	sample_videos=DogDataset('./data/train.csv',
+	sample_videos=DogDataset('./face_data/train.csv',
 				 num_frames=16,
 				 num_samples_per_cls=60,
 				 num_class=2,
