@@ -558,15 +558,15 @@ class afterNorm_Noise(object):
 
 			noise=np.random.normal(loc=0,scale=1,size=img.size())
 			noise=torch.from_numpy(noise)
-			print(noise)
-			plt.imshow(noise.detach().permute(0,2,3,1)[0])
-			plt.show()
+			#print(noise)
+			#plt.imshow(noise.detach().permute(0,2,3,1)[0])
+			#plt.show()
 
 			img= img+noise*self.var+self.mean #adding noise with value expected from before normalize
 			
 			#clip value to 255
-			print("the number of clipped noise is{} ".format(torch.sum(img>1)))
-			print("the number of clipped noise is{} ".format(torch.sum(img<0)))
+			#print("the number of clipped noise is{} ".format(torch.sum(img>1)))
+			#print("the number of clipped noise is{} ".format(torch.sum(img<0)))
 			#img[img>1]=1
 			#img[img<0]=0
 
@@ -574,10 +574,10 @@ class afterNorm_Noise(object):
 
 			#print(torch.sum(before!=img).item())
 
-			sample=img.detach().permute(0,2,3,1)[0]
-			print(sample)
-			plt.imshow(sample)
-			plt.show()
+			#sample=img.detach().permute(0,2,3,1)[0]
+			#print(sample)
+			#plt.imshow(sample)
+			#plt.show()
 
 			return img
 		else:
@@ -670,7 +670,7 @@ def transforms_train_dog(img_size=224,
 					 mean=IMAGENET_DEFAULT_MEAN,
 					 std=IMAGENET_DEFAULT_STD,
 					 noise=0.2,
-					 rotate=0.3
+					 rotate=0.3,
 					 ):
 	"""
 	If separate==True, the transforms are returned as a tuple of 3 separate transforms
@@ -685,13 +685,11 @@ def transforms_train_dog(img_size=224,
 	crop_pct = crop_pct or DEFAULT_CROP_PCT # for resize transform
 	scale_size = int(math.floor(img_size / crop_pct))  #output a turple//scale to magnify abit
 
-	primary_tfl=[transforms.Resize(scale_size, interpolation=str_to_interp_mode(interpolation)),]
+	primary_tfl=[transforms.Resize(scale_size, interpolation=str_to_interp_mode(interpolation))]
 	#secondary tfl to include augmentation operation
 	secondary_tfl = []
 	
 	if augmentation:
-		# add Gausian Noise
-		#secondary_tfl+=[AddNoise(prob=noise)]
 		# add flip 
 		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
 		### to add rotation 
@@ -724,7 +722,7 @@ def transforms_train_dog(img_size=224,
 			std=torch.tensor(std))
 	]
 	#adding noise after norm better
-	final_tfl+=[afterNorm_Noise(noise,mean=0.45, var=0.225)]
+	final_tfl+=[afterNorm_Noise(noise,mean=0.45, var=0.225)] if augmentation else []
 	#if objective == 'mim':
 		#return [Compose(primary_tfl + secondary_tfl), Compose(final_tfl)]
 	

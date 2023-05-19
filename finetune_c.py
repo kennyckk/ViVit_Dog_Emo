@@ -4,6 +4,7 @@ from torch import optim, nn, utils, Tensor
 import lightning.pytorch as pl
 from torchmetrics import Accuracy
 from tqdm.auto import tqdm
+import numpy as np
 
 from video_transformer import ViViT
 from transformer import ClassificationHead
@@ -192,6 +193,9 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 
 
 if __name__ == "__main__":
+    torch.manual_seed(123)
+    np.random.seed(123)
+
     # to add in parser for hyperparameters
     ep=10
     clip_value=1 # 0 for disabling grad clip by value
@@ -200,8 +204,8 @@ if __name__ == "__main__":
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth')
     # load in preprocessed Dataset
-    train_dataset, val_dataset = load_dataset('./data/train.csv',
-                                              './data/eval.csv')
+    train_dataset, val_dataset = load_dataset('./face_data/train.csv',
+                                              './face_data/eval.csv')
     # load them to Data Loader
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 4)
 
@@ -209,7 +213,7 @@ if __name__ == "__main__":
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
     #
     optimizer = optim.SGD(model.parameters(), momentum=0.9, nesterov=True,
-                          lr=0.0005, weight_decay=0.05)
+                          lr=0.00005, weight_decay=0.05)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=1, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
