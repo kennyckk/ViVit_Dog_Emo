@@ -153,14 +153,16 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             train_correct += batch_correct
             train_total += labels.size(0)
 
-            #lr scheduler update
-            lr_sched.step()
+            #lr scheduler update (step)
+            #lr_sched.step()
             # Monitor Progress
             if step % step_log == 0:  # print accuracy and loss every 10 steps
                 print("current progress are ep{}: {}/{}".format(ep,step+1,len(train_loader)))
                 print("the training loss for this batch:{}".format(batch_loss))
                 print("the training accuracy for this batch: {}".format(batch_correct / labels.size(0)))
             progress_bar.update(1)
+        #lr scheduler update (ep)
+        lr_sched.step()
 
         # Save model and monitor result for this ep
         print(" epoch{}: average accuracy:{}; total loss:{}".format(ep + 1, train_correct / train_total, total_loss))
@@ -208,7 +210,7 @@ if __name__ == "__main__":
     #
     optimizer = optim.SGD(model.parameters(), momentum=0.9, nesterov=True,
                           lr=0.0005, weight_decay=0.05)
-    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4, T_mult=1, eta_min=1e-6,last_epoch=-1)
+    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=1, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
     #path for saving the model

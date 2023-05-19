@@ -6,3 +6,4 @@ data/videos
 test.py
 lightning_logs/
 saved_model/
+face_data/videos
