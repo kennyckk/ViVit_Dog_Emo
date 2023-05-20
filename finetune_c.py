@@ -49,7 +49,7 @@ def load_dataset(
         auto_augment=None,
         num_frames=16,
         frame_interval=16,
-        hflip=0.8,
+        hflip=0.8,noise=0.2
         ):
     color_jitter = 0.4
     scale = None
@@ -87,7 +87,8 @@ def load_dataset(
                         auto_augment=auto_augment,
                         interpolation='bicubic',
                         mean=mean,
-                        std=std,)
+                        std=std,
+                        noise=noise)
         
         train_dataset=concat_train_dataset(train_dataset,aug_size,aug_train_transform,temporal_sample,train_ann_path)
 
@@ -199,13 +200,15 @@ if __name__ == "__main__":
     # to add in parser for hyperparameters
     ep=20
     clip_value=1 # 0 for disabling grad clip by value
+    noise=0
+    lr=0.00005
 
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth')
     # load in preprocessed Dataset
     train_dataset, val_dataset = load_dataset('./face_data/train.csv',
-                                              './face_data/eval.csv')
+                                              './face_data/eval.csv',noise=noise)
     # load them to Data Loader
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 4)
 
@@ -213,7 +216,7 @@ if __name__ == "__main__":
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
     #
     optimizer = optim.SGD(model.parameters(), momentum=0.9, nesterov=True,
-                          lr=0.00005, weight_decay=0.05)
+                          lr=lr, weight_decay=0.05)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=1, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
