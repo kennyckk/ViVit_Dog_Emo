@@ -14,13 +14,22 @@ from dataset import DogDataset
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
+#freezing function for parameters
+def freeze_layers(model,freeze_map=None):
+    if freeze_map ==None:
+        for _, param in model.named_parameters():
+            param.requires_grad=False
+    return model
+
 # Function to load in model
-def load_model(pretrain_pth, num_class=2,drop_out=0.3):
+def load_model(pretrain_pth, num_class=2,drop_out=0.3,freeze=False):
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from='kinetics',
                   img_size=224,
                   num_frames=16,
                   attention_type='fact_encoder',
                   dropout_p=drop_out)
+    if freeze:
+        vivit=freeze_layers(vivit)
 
     cls_head = ClassificationHead(num_classes=num_class, in_channels=768)
 
@@ -198,14 +207,16 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=20
+    ep=10
     clip_value=1 # 0 for disabling grad clip by value
     noise=0
     lr=0.00005
 
 
     # load in Vivit and Class_Head
-    model = load_model('./vivit_model.pth')
+    model = load_model('./vivit_model.pth',freeze=True)
+    parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
+    #print(parameters)
     # load in preprocessed Dataset
     train_dataset, val_dataset = load_dataset('./face_data/train.csv',
                                               './face_data/eval.csv',noise=noise)
@@ -215,7 +226,7 @@ if __name__ == "__main__":
     #define optimizer and loss function
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
     #
-    optimizer = optim.SGD(model.parameters(), momentum=0.9, nesterov=True,
+    optimizer = optim.SGD(parameters, momentum=0.9, nesterov=True,
                           lr=lr, weight_decay=0.05)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=1, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
