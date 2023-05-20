@@ -197,7 +197,7 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=10
+    ep=20
     clip_value=1 # 0 for disabling grad clip by value
 
 
