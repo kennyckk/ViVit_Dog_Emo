@@ -207,19 +207,20 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=10
+    ep=20
     clip_value=1 # 0 for disabling grad clip by value
-    noise=0
+    noise=0.2
     lr=0.00005
-
+    auto_augment=True
+    freeze=False
 
     # load in Vivit and Class_Head
-    model = load_model('./vivit_model.pth',freeze=True)
+    model = load_model('./vivit_model.pth',freeze=freeze)
     parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
     #print(parameters)
     # load in preprocessed Dataset
     train_dataset, val_dataset = load_dataset('./face_data/train.csv',
-                                              './face_data/eval.csv',noise=noise)
+                                              './face_data/eval.csv',noise=noise,auto_augment=auto_augment)
     # load them to Data Loader
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 4)
 
@@ -227,7 +228,7 @@ if __name__ == "__main__":
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
     #
     optimizer = optim.SGD(parameters, momentum=0.9, nesterov=True,
-                          lr=lr, weight_decay=0.05)
+                          lr=lr, weight_decay=0.1)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=1, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 

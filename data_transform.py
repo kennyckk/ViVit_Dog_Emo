@@ -723,6 +723,7 @@ def transforms_train_dog(img_size=224,
 	]
 	#adding noise after norm better
 	final_tfl+=[afterNorm_Noise(noise,mean=0.45, var=0.225)] if augmentation else []
+	
 	#if objective == 'mim':
 		#return [Compose(primary_tfl + secondary_tfl), Compose(final_tfl)]
 	
