@@ -5,6 +5,7 @@ import lightning.pytorch as pl
 from torchmetrics import Accuracy
 from tqdm.auto import tqdm
 import numpy as np
+import matplotlib.pyplot as plt
 
 from video_transformer import ViViT
 from transformer import ClassificationHead
@@ -129,10 +130,33 @@ def load_DataLoader(train_dataset, val_dataset, batch_size, num_worker=0):
     return train_DataLoader, val_DataLoader
 
 
+def plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log):
+    ep=len(train_loss_log)
+    x=np.linspace(1,ep,num=ep)
+
+    fig=plt.figure()
+    ax0=fig.add_subplot(121,title='loss')
+    ax1=fig.add_subplot(122,title='accuracy')
+
+    ax0.plot(x,train_loss_log,'bo-',label='train')
+    ax0.plot(x,eval_loss_log,'ro-',label='val')
+    ax1.plot(x,train_acc_log,'bo-',label='train')
+    ax1.plot(x,eval_acc_log,'ro-',label='val')
+
+    ax0.legend()
+    ax1.legend()
+
+    fig.savefig('./loss_acc_graph.jpg')
+
 def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10):
     # may add accelerator ....
 
     progress_bar = tqdm(range(epochs * len(train_loader)))
+    train_loss_log=[]
+    train_acc_log=[]
+    eval_loss_log=[]
+    eval_acc_log=[]
+    
 
     for ep in range(epochs):
         model.train()
@@ -176,10 +200,15 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
         lr_sched.step()
 
         # Save model and monitor result for this ep
-        print(" epoch{}: average accuracy:{}; total loss:{}".format(ep + 1, train_correct / train_total, total_loss))
+        train_acc=train_correct / train_total
+        print(" epoch{}: average accuracy:{}; total loss:{}".format(ep + 1, train_acc, total_loss))
         saved_path=os.path.join(save_path, "ep{}_saved".format(ep + 1))
         torch.save(model.state_dict(), saved_path)
         print('Model saved in {}'.format(saved_path))
+        # append to train_loss list for plotting
+        train_loss_log.append(total_loss/len(train_loader))
+        train_acc_log.append(train_acc)
+
 
         # to do eval per epoch end
         print("Evaluation for ep{} start!".format(ep + 1))
@@ -199,7 +228,12 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 
                 print("Eval Progress:{}/{}".format(eval_step + 1, len(val_loader)))
         eval_accuracy = eval_correct / eval_total
+        #to log the loss eval for this ep for plotting
+        eval_loss_log.append(eval_loss/len(val_loader))
+        eval_acc_log.append(eval_accuracy)
         print("the eval accuracy:{}; eval loss:{}".format(eval_accuracy, eval_loss))
+    
+    return train_loss_log,train_acc_log,eval_loss_log,eval_acc_log
 
 
 if __name__ == "__main__":
@@ -237,5 +271,16 @@ if __name__ == "__main__":
     os.makedirs(PATH,exist_ok=True)
 
     #Finetuning for the Vivit Classifier for Dog video emotions
-    training_loop(model, train_DataLoader, val_DataLoader, ep, optimizer,lr_sched, criterion, PATH,clip_value, step_log=5)
+    train_loss_log,train_acc_log,eval_loss_log,eval_acc_log=training_loop(model, 
+                                                                            train_DataLoader, 
+                                                                            val_DataLoader, 
+                                                                            ep, 
+                                                                            optimizer,
+                                                                            lr_sched, 
+                                                                            criterion, 
+                                                                            PATH,
+                                                                            clip_value, 
+                                                                            step_log=5)
 
+    #plotting
+    plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
