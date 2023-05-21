@@ -156,7 +156,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
     train_acc_log=[]
     eval_loss_log=[]
     eval_acc_log=[]
-    
+    best_eval_loss=float('inf')
 
     for ep in range(epochs):
         model.train()
@@ -199,12 +199,9 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
         #lr scheduler update (ep)
         lr_sched.step()
 
-        # Save model and monitor result for this ep
+        # Show results of this train epoch
         train_acc=train_correct / train_total
         print(" epoch{}: average accuracy:{}; total loss:{}".format(ep + 1, train_acc, total_loss))
-        saved_path=os.path.join(save_path, "ep{}_saved".format(ep + 1))
-        torch.save(model.state_dict(), saved_path)
-        print('Model saved in {}'.format(saved_path))
         # append to train_loss list for plotting
         train_loss_log.append(total_loss/len(train_loader))
         train_acc_log.append(train_acc)
@@ -232,6 +229,15 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
         eval_loss_log.append(eval_loss/len(val_loader))
         eval_acc_log.append(eval_accuracy)
         print("the eval accuracy:{}; eval loss:{}".format(eval_accuracy, eval_loss))
+
+        #save the model after eval and verify loss dropped:
+        #only save the model when it performs better than prev eval loss
+        if eval_loss_log[-1]<best_eval_loss:
+            best_eval_loss=eval_loss_log[-1]
+            saved_path=os.path.join(save_path, "best_model.pth")
+            torch.save(model.state_dict(), saved_path)
+            print('Model saved in {}'.format(saved_path))
+            print(f'the model saved obtained in ep {ep+1}')
     
     return train_loss_log,train_acc_log,eval_loss_log,eval_acc_log
 
@@ -246,8 +252,8 @@ if __name__ == "__main__":
     noise=0.2
     lr=0.00005
     auto_augment=True
-    freeze=False
-    weight_decay=0.5 #0.05 for original
+    freeze=True
+    weight_decay=0.1 #0.05 for original
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth',freeze=freeze)
