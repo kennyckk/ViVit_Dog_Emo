@@ -241,12 +241,13 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=20
+    ep=30
     clip_value=1 # 0 for disabling grad clip by value
     noise=0.2
     lr=0.00005
     auto_augment=True
     freeze=False
+    weight_decay=0.5 #0.05 for original
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth',freeze=freeze)
@@ -262,7 +263,7 @@ if __name__ == "__main__":
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
     #
     optimizer = optim.SGD(parameters, momentum=0.9, nesterov=True,
-                          lr=lr, weight_decay=0.1)
+                          lr=lr, weight_decay=weight_decay)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=1, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
