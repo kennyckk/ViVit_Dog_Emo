@@ -24,21 +24,22 @@ def freeze_layers(model,freeze_map=None):
 
 #add drop out rate in different transformer layer
 def drop_out_loop(model,drop_out):
+    no_drop=("drop_after_time", "drop_after_pos")
     for _ , m in enumerate(model.named_modules()):
-        
+        path=m[0]
         component=m[1]
-        if isinstance(component,nn.Dropout):
+        if isinstance(component,nn.Dropout) and path not in no_drop:
             component.p=drop_out
             #component.inplace=True
 
 
 # Function to load in model
-def load_model(pretrain_pth, num_class=2,drop_out=0.3,freeze=False):
+def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False, ):
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from='kinetics',
                   img_size=224,
                   num_frames=16,
                   attention_type='fact_encoder',
-                  dropout_p=drop_out)
+                  dropout_p=0)
     # to change the activate the drop out layer in each transformer layer
     if drop_out>0:
         drop_out_loop(vivit,drop_out)
@@ -264,7 +265,7 @@ if __name__ == "__main__":
     ep=30
     clip_value=1 # 0 for disabling grad clip by value
     noise=0.2
-    lr=0.00005
+    lr=0.0005
     auto_augment=False
     freeze=False
     weight_decay=0.05 #0.05 for original
