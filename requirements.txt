@@ -90,12 +90,12 @@ thop==0.1.1.post2209072238
 threadpoolctl==3.1.0
 tifffile==2023.4.12
 timm==0.4.12
-torch==2.0.1+cu117 --index-url https://download.pytorch.org/whl/cu117
-torchaudio==2.0.2+cu117 --index-url https://download.pytorch.org/whl/cu117
+torch==2.0.1 --index-url https://download.pytorch.org/whl/cu117
+torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu117
 torchdata==0.6.1
 torchmetrics==0.11.4
 torchtext==0.15.2
-torchvision==0.15.2+cu117 --index-url https://download.pytorch.org/whl/cu117
+torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu117
 tqdm==4.65.0
 traitlets==5.9.0
 typing_extensions==4.4.0
