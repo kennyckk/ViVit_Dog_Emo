@@ -25,10 +25,11 @@ def freeze_layers(model,freeze_map=None):
 #add drop out rate in different transformer layer
 def drop_out_loop(model,drop_out):
     for _ , m in enumerate(model.named_modules()):
-        path= m[0]
+        
         component=m[1]
         if isinstance(component,nn.Dropout):
             component.p=drop_out
+            #component.inplace=True
 
 
 # Function to load in model
@@ -40,7 +41,7 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.3,freeze=False):
                   dropout_p=drop_out)
     # to change the activate the drop out layer in each transformer layer
     if drop_out>0:
-        drop_out_loop(model,drop_out)
+        drop_out_loop(vivit,drop_out)
     
     if freeze:
         vivit=freeze_layers(vivit)
@@ -260,13 +261,13 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=20
+    ep=30
     clip_value=1 # 0 for disabling grad clip by value
     noise=0.2
-    lr=0.0005
+    lr=0.00005
     auto_augment=False
-    freeze=True
-    weight_decay=0.5 #0.05 for original
+    freeze=False
+    weight_decay=0.05 #0.05 for original
     T_0=4
     drop_out=0.3
 
