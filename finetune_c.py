@@ -189,7 +189,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             train_total += labels.size(0)
 
             #lr scheduler update (step)
-            #lr_sched.step()
+            lr_sched.step()
             # Monitor Progress
             if step % step_log == 0:  # print accuracy and loss every 10 steps
                 print("current progress are ep{}: {}/{}".format(ep,step+1,len(train_loader)))
@@ -197,7 +197,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
                 print("the training accuracy for this batch: {}".format(batch_correct / labels.size(0)))
             progress_bar.update(1)
         #lr scheduler update (ep)
-        lr_sched.step()
+        #lr_sched.step()
 
         # Show results of this train epoch
         train_acc=train_correct / train_total
@@ -247,13 +247,14 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=30
+    ep=20
     clip_value=1 # 0 for disabling grad clip by value
     noise=0.2
-    lr=0.00005
-    auto_augment=True
+    lr=0.0005
+    auto_augment=False
     freeze=True
-    weight_decay=0.1 #0.05 for original
+    weight_decay=0.5 #0.05 for original
+    T_0=4
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth',freeze=freeze)
@@ -270,7 +271,7 @@ if __name__ == "__main__":
     #
     optimizer = optim.SGD(parameters, momentum=0.9, nesterov=True,
                           lr=lr, weight_decay=weight_decay)
-    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=1, T_mult=1, eta_min=1e-6,last_epoch=-1)
+    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
     #path for saving the model

@@ -554,13 +554,14 @@ class afterNorm_Noise(object):
 			dtype= img.dtype
 			#before=img.detach()
 
-			#img=img.to(torch.float32)			
+			img=img.to(torch.float32)			
 
-			noise=np.random.normal(loc=0,scale=1,size=img.size())
-			noise=torch.from_numpy(noise)
-			#print(noise)
-			#plt.imshow(noise.detach().permute(0,2,3,1)[0])
-			#plt.show()
+			#noise=np.random.normal(loc=0,scale=1,size=img.size())
+			#noise=torch.from_numpy(noise)
+			noise=torch.randn(size=img.size())
+			# print(torch.sum(noise<0), torch.sum(noise>1))
+			# plt.imshow(noise.detach().permute(0,2,3,1)[0])
+			# plt.show()
 
 			img= img+noise*self.var+self.mean #adding noise with value expected from before normalize
 			
@@ -722,7 +723,7 @@ def transforms_train_dog(img_size=224,
 			std=torch.tensor(std))
 	]
 	#adding noise after norm better
-	final_tfl+=[afterNorm_Noise(noise,mean=0.45, var=0.225)] if augmentation else []
+	final_tfl+=[afterNorm_Noise(noise,mean=0, var=1)] if augmentation else []
 	
 	#if objective == 'mim':
 		#return [Compose(primary_tfl + secondary_tfl), Compose(final_tfl)]

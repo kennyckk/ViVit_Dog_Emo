@@ -395,23 +395,23 @@ if __name__=="__main__":
 	train_temporal_sample = T.TemporalRandomCrop(
     16 * 16)
 
-	# aug_transform= T.transforms_train_dog(img_size=224,
-    #                 augmentation=True,
-	# 				crop_pct=None,
-	# 				 hflip=0.6, # 0 for non-augment data
-	# 				 auto_augment=None,
-	# 				 interpolation='bicubic',
-	# 				 rotate=1,
-	# 				 noise=1
-	# 				 )
-	transform=T.transforms_eval(img_size=224,
+	transform= T.transforms_train_dog(img_size=224,
+                    augmentation=True,
 					crop_pct=None,
-					interpolation='bicubic',
-					mean=(0.45, 0.45, 0.45),
-					std= (0.225, 0.225, 0.225))
+					 hflip=0.6, # 0 for non-augment data
+					 auto_augment=None,
+					 interpolation='bicubic',
+					 rotate=1,
+					 noise=1
+					 )
+	# transform=T.transforms_eval(img_size=224,
+	# 				crop_pct=None,
+	# 				interpolation='bicubic',
+	# 				mean=(0.45, 0.45, 0.45),
+	# 				std= (0.225, 0.225, 0.225))
 
 
-	sample_videos=DogDataset('./face_data/eval.csv',
+	sample_videos=DogDataset('./face_data/train.csv',
 				 num_frames=16,
 				 num_samples_per_cls=60,
 				 num_class=2,
