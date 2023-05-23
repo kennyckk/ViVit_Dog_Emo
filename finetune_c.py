@@ -22,6 +22,15 @@ def freeze_layers(model,freeze_map=None):
             param.requires_grad=False
     return model
 
+#add drop out rate in different transformer layer
+def drop_out_loop(model,drop_out):
+    for _ , m in enumerate(model.named_modules()):
+        path= m[0]
+        component=m[1]
+        if isinstance(component,nn.Dropout):
+            component.p=drop_out
+
+
 # Function to load in model
 def load_model(pretrain_pth, num_class=2,drop_out=0.3,freeze=False):
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from='kinetics',
@@ -29,6 +38,10 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.3,freeze=False):
                   num_frames=16,
                   attention_type='fact_encoder',
                   dropout_p=drop_out)
+    # to change the activate the drop out layer in each transformer layer
+    if drop_out>0:
+        drop_out_loop(model,drop_out)
+    
     if freeze:
         vivit=freeze_layers(vivit)
 
@@ -255,9 +268,10 @@ if __name__ == "__main__":
     freeze=True
     weight_decay=0.5 #0.05 for original
     T_0=4
+    drop_out=0.3
 
     # load in Vivit and Class_Head
-    model = load_model('./vivit_model.pth',freeze=freeze)
+    model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out)
     parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
     #print(parameters)
     # load in preprocessed Dataset
