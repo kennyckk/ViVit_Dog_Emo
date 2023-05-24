@@ -53,12 +53,30 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False, ):
     return model.to(device)
 
 
-def concat_train_dataset(train_dataset,aug_size,aug_transform,temporal_sample,path):
+def concat_train_dataset(train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise,mean,std,
+img_size=224,color_jitter=None,):
     #prepare list for all training data
     train_list=[train_dataset]
+    #gradually incrase the chance of more augmentation with more augmentation size
+    rotate_values=np.linspace(rotate,1,aug_size) 
+    hflip_values=np.linspace(hflip,1,aug_size)
+    noise_values=np.linspace(noise,0.5,aug_size)
+
     #instantiate multiple dataset object with augmented data
-    for _ in range(aug_size):
-            aug_train_dataset = DogDataset(path, transform=aug_transform, temporal_sample=temporal_sample)
+    for i in range(aug_size):
+            aug_train_transform= transforms_train_dog(img_size=img_size,
+                        augmentation=True,
+                        crop_pct=None,
+                        color_jitter=color_jitter,
+                        auto_augment=auto_augment,
+                        interpolation='bicubic',
+                        mean=mean,
+                        std=std,
+                        rotate=rotate_values[i],
+                        hflip=hflip_values[i], # 0 for non-augment data
+                        noise=noise_values[i])
+
+            aug_train_dataset = DogDataset(path, transform=aug_train_transform, temporal_sample=temporal_sample)
             train_list.append(aug_train_dataset)
 
     return utils.data.ConcatDataset(train_list)
@@ -105,19 +123,12 @@ def load_dataset(
     # to implement additional augmentation
     if aug_size>0:
         
-        #prepare augmentation transform
-        aug_train_transform= transforms_train_dog(img_size=img_size,
-                        augmentation=True,
-                        crop_pct=None,
-                        hflip=hflip, # 0 for non-augment data
-                        color_jitter=color_jitter,
-                        auto_augment=auto_augment,
-                        interpolation='bicubic',
-                        mean=mean,
-                        std=std,
-                        noise=noise)
-        
-        train_dataset=concat_train_dataset(train_dataset,aug_size,aug_train_transform,temporal_sample,train_ann_path)
+        #train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise
+        #concatenate more augmented dataset
+        train_dataset=concat_train_dataset(train_dataset,aug_size,temporal_sample,train_ann_path,rotate,hflip,noise,
+        mean,std,
+        img_size=img_size,
+        color_jitter=color_jitter)
 
 
     val_transform = create_video_transform(
@@ -273,6 +284,7 @@ if __name__ == "__main__":
     weight_decay=0.05 #0.05 for original
     T_0=4  # optim in step wise 
     drop_out=0.3
+    aug_size=1
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out)
@@ -280,7 +292,10 @@ if __name__ == "__main__":
     #print(parameters)
     # load in preprocessed Dataset
     train_dataset, val_dataset = load_dataset('./face_data/train.csv',
-                                              './face_data/eval.csv',noise=noise,auto_augment=auto_augment)
+                                              './face_data/eval.csv',
+                                              noise=noise,
+                                              auto_augment=auto_augment,
+                                              aug_size=aug_size)
     # load them to Data Loader
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 4)
 
