@@ -91,7 +91,7 @@ def load_dataset(
         img_size=224,
         auto_augment=None,
         num_frames=16,
-        frame_interval=16,
+        frame_interval=8,
         hflip=0.8,
         noise=0.2,
         rotate=0.3
@@ -285,6 +285,7 @@ if __name__ == "__main__":
     T_0=4  # optim in step wise 
     drop_out=0.3
     aug_size=1
+    frame_interval=8
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out)
@@ -295,7 +296,8 @@ if __name__ == "__main__":
                                               './face_data/eval.csv',
                                               noise=noise,
                                               auto_augment=auto_augment,
-                                              aug_size=aug_size)
+                                              aug_size=aug_size,
+                                              frame_interval=frame_interval)
     # load them to Data Loader
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 4)
 
