@@ -664,7 +664,6 @@ def transforms_train_dog(img_size=224,
 					crop_pct=None,
 					 scale=None,
 					 ratio=None,
-					 hflip=0.8, # 0 for non-augment data
 					 color_jitter=0.4,
 					 auto_augment=None,
 					 interpolation='random',
@@ -672,6 +671,7 @@ def transforms_train_dog(img_size=224,
 					 std=IMAGENET_DEFAULT_STD,
 					 noise=0.2,
 					 rotate=0.3,
+					 hflip=0.8, # 0 for non-augment data
 					 ):
 	"""
 	If separate==True, the transforms are returned as a tuple of 3 separate transforms

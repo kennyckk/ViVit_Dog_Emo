@@ -39,10 +39,10 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False, ):
                   img_size=224,
                   num_frames=16,
                   attention_type='fact_encoder',
-                  dropout_p=0)
+                  dropout_p=drop_out)
     # to change the activate the drop out layer in each transformer layer
-    if drop_out>0:
-        drop_out_loop(vivit,drop_out)
+    # if drop_out>0:
+    #     drop_out_loop(vivit,drop_out)
     
     if freeze:
         vivit=freeze_layers(vivit)
@@ -74,7 +74,9 @@ def load_dataset(
         auto_augment=None,
         num_frames=16,
         frame_interval=16,
-        hflip=0.8,noise=0.2
+        hflip=0.8,
+        noise=0.2,
+        rotate=0.3
         ):
     color_jitter = 0.4
     scale = None
@@ -262,14 +264,14 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=30
+    ep=20
     clip_value=1 # 0 for disabling grad clip by value
     noise=0.2
     lr=0.0005
     auto_augment=False
-    freeze=False
+    freeze=True
     weight_decay=0.05 #0.05 for original
-    T_0=4
+    T_0=4  # optim in step wise 
     drop_out=0.3
 
     # load in Vivit and Class_Head
