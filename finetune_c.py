@@ -77,7 +77,7 @@ img_size=224,color_jitter=None,):
                         std=std,
                         rotate=rotate_values[i],
                         hflip=hflip_values[i], # 0 for non-augment data
-                        noise=noise_values[i])
+                        noise=0)#noise_values[i])
 
             aug_train_dataset = DogDataset(path, transform=aug_train_transform, temporal_sample=temporal_sample,num_frames=num_frames)
             train_list.append(aug_train_dataset)
@@ -294,22 +294,22 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=20
+    ep=30
     clip_value=1 # 0 for disabling grad clip by value
     noise=0
     lr=0.0005
     auto_augment=False
     freeze=False
-    weight_decay=0 #0.05 for original
+    weight_decay=0.05 #0.05 for original
     T_0=4 # optim in step wise 
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
-    aug_size=1
+    aug_size=3
     frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
     batch_size=4
-    momentum=0
-    nesterov=False
-    input_batchNorm=True
+    momentum=0.9
+    nesterov=True
+    input_batchNorm=False
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
@@ -327,11 +327,12 @@ if __name__ == "__main__":
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, batch_size=batch_size)
 
     #define optimizer and loss function
-    #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
+    #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=lr, weight_decay=weight_decay)
     #
     optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,
-                          lr=lr, weight_decay=weight_decay)
+                         lr=lr, weight_decay=weight_decay)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=1e-6,last_epoch=-1)
+    #lr_sched=None
     criterion = nn.CrossEntropyLoss()
 
     #path for saving the model
