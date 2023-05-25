@@ -34,7 +34,7 @@ def drop_out_loop(model,drop_out):
 
 
 # Function to load in model
-def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16 ):
+def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16,input_batchNorm=False ):
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from='kinetics',
                   img_size=224,
                   num_frames=num_frames,
@@ -49,7 +49,7 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16
 
     cls_head = ClassificationHead(num_classes=num_class, in_channels=768)
 
-    model = nn.Sequential(vivit, cls_head)
+    model = nn.Sequential(nn.BatchNorm3d(num_frames),vivit,cls_head)
     return model.to(device)
 
 
@@ -303,12 +303,13 @@ if __name__ == "__main__":
     aug_size=1
     frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
-    batch_size=4
+    batch_size=8
     momentum=0
     nesterov=False
+    input_batchNorm=True
 
     # load in Vivit and Class_Head
-    model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out,num_frames=num_frames)
+    model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
     parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
     #print(parameters)
     # load in preprocessed Dataset
