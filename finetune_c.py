@@ -48,8 +48,11 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16
         vivit=freeze_layers(vivit)
 
     cls_head = ClassificationHead(num_classes=num_class, in_channels=768)
+    modules=[vivit,cls_head]
+    if input_batchNorm:#activate for input normalization along temporal axis
+        modules=[nn.BatchNorm3d(num_frames)]+modules
 
-    model = nn.Sequential(nn.BatchNorm3d(num_frames),vivit,cls_head)
+    model = nn.Sequential(*modules)
     return model.to(device)
 
 
@@ -303,7 +306,7 @@ if __name__ == "__main__":
     aug_size=1
     frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
-    batch_size=8
+    batch_size=4
     momentum=0
     nesterov=False
     input_batchNorm=True
