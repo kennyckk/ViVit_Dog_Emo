@@ -279,6 +279,9 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             torch.save(model.state_dict(), saved_path)
             print('Model saved in {}'.format(saved_path))
             print(f'the model saved obtained in ep {ep+1}')
+        
+        if ep>=10:
+            plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
     
     return train_loss_log,train_acc_log,eval_loss_log,eval_acc_log
 
@@ -290,7 +293,7 @@ if __name__ == "__main__":
     # to add in parser for hyperparameters
     ep=20
     clip_value=1 # 0 for disabling grad clip by value
-    noise=0.2
+    noise=0
     lr=0.0005
     auto_augment=False
     freeze=False
