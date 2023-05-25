@@ -34,10 +34,10 @@ def drop_out_loop(model,drop_out):
 
 
 # Function to load in model
-def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False, ):
+def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16 ):
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from='kinetics',
                   img_size=224,
-                  num_frames=16,
+                  num_frames=num_frames,
                   attention_type='fact_encoder',
                   dropout_p=drop_out)
     # to change the activate the drop out layer in each transformer layer
@@ -53,7 +53,7 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False, ):
     return model.to(device)
 
 
-def concat_train_dataset(train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise,mean,std,
+def concat_train_dataset(train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise,mean,std,num_frames,
 img_size=224,color_jitter=None,):
     #prepare list for all training data
     train_list=[train_dataset]
@@ -76,7 +76,7 @@ img_size=224,color_jitter=None,):
                         hflip=hflip_values[i], # 0 for non-augment data
                         noise=noise_values[i])
 
-            aug_train_dataset = DogDataset(path, transform=aug_train_transform, temporal_sample=temporal_sample)
+            aug_train_dataset = DogDataset(path, transform=aug_train_transform, temporal_sample=temporal_sample,num_frames=num_frames)
             train_list.append(aug_train_dataset)
 
     return utils.data.ConcatDataset(train_list)
@@ -119,14 +119,14 @@ def load_dataset(
 					 interpolation='bicubic',
 					 mean=mean,
 					 std=std,)
-    train_dataset = DogDataset(train_ann_path, transform=train_transform, temporal_sample=temporal_sample)
+    train_dataset = DogDataset(train_ann_path, transform=train_transform, temporal_sample=temporal_sample,num_frames=num_frames)
     # to implement additional augmentation
     if aug_size>0:
         
         #train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise
         #concatenate more augmented dataset
         train_dataset=concat_train_dataset(train_dataset,aug_size,temporal_sample,train_ann_path,rotate,hflip,noise,
-        mean,std,
+        mean,std,num_frames,
         img_size=img_size,
         color_jitter=color_jitter)
 
@@ -139,7 +139,7 @@ def load_dataset(
         std=std)
 
     # use the dataset class to load in DAtaset Obj
-    val_dataset = DogDataset(val_ann_path, transform=val_transform, temporal_sample=temporal_sample)
+    val_dataset = DogDataset(val_ann_path, transform=val_transform, temporal_sample=temporal_sample,num_frames=num_frames)
     
 
     return train_dataset, val_dataset
@@ -275,20 +275,22 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=20
+    ep=30
     clip_value=1 # 0 for disabling grad clip by value
     noise=0.2
-    lr=0.0005
+    lr=0.0001
     auto_augment=False
-    freeze=True
+    freeze=False
     weight_decay=0.05 #0.05 for original
-    T_0=4  # optim in step wise 
-    drop_out=0.3
-    aug_size=1
-    frame_interval=8
+    T_0=4 # optim in step wise 
+    drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
+    aug_size=3 
+    frame_interval=8 #tune samller for more randomness in temproal sampling
+    num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
+    batch_size=4
 
     # load in Vivit and Class_Head
-    model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out)
+    model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out,num_frames=num_frames)
     parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
     #print(parameters)
     # load in preprocessed Dataset
@@ -297,9 +299,10 @@ if __name__ == "__main__":
                                               noise=noise,
                                               auto_augment=auto_augment,
                                               aug_size=aug_size,
-                                              frame_interval=frame_interval)
+                                              frame_interval=frame_interval,
+                                              num_frames=num_frames)
     # load them to Data Loader
-    train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, 4)
+    train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, batch_size=batch_size)
 
     #define optimizer and loss function
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
