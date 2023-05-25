@@ -199,26 +199,26 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             loss = criterion(outputs, labels)
 
             # BP and optimize
-            with torch.autograd.set_detect_anomaly(True):
+            with torch.autograd.set_detect_anomaly(False):
                 optimizer.zero_grad()
                 loss.backward()
 
                 #to clip the parameters grad by values
                 if clip_value>0:
                     nn.utils.clip_grad_value_(model.parameters(),clip_value)
-                if ep>=10:
-                    for name, params in model.named_parameters():
-                        print(name, torch.isfinite(params.grad).all())
-                        if torch.isnan(params).any():
-                            print(f"{name} is haveing NaN weight")
+                # if ep>=10:
+                #     for name, params in model.named_parameters():
+                #         print(name, torch.isfinite(params.grad).all())
+                #         if torch.isnan(params).any():
+                #             print(f"{name} is haveing NaN weight")
                 
                 # update parameters
                 optimizer.step()
 
                 #check NaN weights after grad update
-                if ep>=10:
-                    if torch.stack([torch.isnan(p).any() for p in model.parameters()]).any().item():
-                        print("weights contain NaN after grad update")
+                # if ep>=10:
+                #     if torch.stack([torch.isnan(p).any() for p in model.parameters()]).any().item():
+                #         print("weights contain NaN after grad update")
                     
             # calculate metrices
             batch_loss = loss.item()
@@ -297,13 +297,15 @@ if __name__ == "__main__":
     lr=0.0005
     auto_augment=False
     freeze=False
-    weight_decay=0.05 #0.05 for original
+    weight_decay=0 #0.05 for original
     T_0=4 # optim in step wise 
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
     aug_size=1
     frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
     batch_size=4
+    momentum=0
+    nesterov=False
 
     # load in Vivit and Class_Head
     model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out,num_frames=num_frames)
@@ -323,7 +325,7 @@ if __name__ == "__main__":
     #define optimizer and loss function
     #optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.005, weight_decay=0.05)
     #
-    optimizer = optim.SGD(parameters, momentum=0.9, nesterov=True,
+    optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,
                           lr=lr, weight_decay=weight_decay)
     lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=1e-6,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
