@@ -199,14 +199,27 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             loss = criterion(outputs, labels)
 
             # BP and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            #to clip the parameters grad by values
-            if clip_value>0:
-                nn.utils.clip_grad_value_(model.parameters(),clip_value)
-            # update parameters
-            optimizer.step()
+            with torch.autograd.set_detect_anomaly(True):
+                optimizer.zero_grad()
+                loss.backward()
 
+                #to clip the parameters grad by values
+                if clip_value>0:
+                    nn.utils.clip_grad_value_(model.parameters(),clip_value)
+                if ep>=10:
+                    for name, params in model.named_parameters():
+                        print(name, torch.isfinite(params.grad).all())
+                        if torch.isnan(params).any():
+                            print(f"{name} is haveing NaN weight")
+                
+                # update parameters
+                optimizer.step()
+
+                #check NaN weights after grad update
+                if ep>=10:
+                    if torch.stack([torch.isnan(p).any() for p in model.parameters()]).any().item():
+                        print("weights contain NaN after grad update")
+                    
             # calculate metrices
             batch_loss = loss.item()
             total_loss += batch_loss
@@ -275,16 +288,16 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=30
+    ep=20
     clip_value=1 # 0 for disabling grad clip by value
     noise=0.2
-    lr=0.0001
+    lr=0.0005
     auto_augment=False
     freeze=False
     weight_decay=0.05 #0.05 for original
     T_0=4 # optim in step wise 
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
-    aug_size=3 
+    aug_size=1
     frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
     batch_size=4
