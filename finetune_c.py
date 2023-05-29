@@ -35,7 +35,9 @@ def drop_out_loop(model,drop_out):
 
 # Function to load in model
 def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16,input_batchNorm=False ):
-    vivit = ViViT(pretrain_pth=pretrain_pth, weights_from='kinetics',
+    weights_from="kinetics" if pretrain_pth!= None else None
+
+    vivit = ViViT(pretrain_pth=pretrain_pth, weights_from=weights_from,
                   img_size=224,
                   num_frames=num_frames,
                   attention_type='fact_encoder',
@@ -296,26 +298,29 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    ep=40
+    pretrain_pth=None  #'./vivit_model.pth'
+    ep=20
     clip_value=1 # 0 for disabling grad clip by value
     noise=0 # currently noise disabled
-    lr=0.00005
+    lr=0.0005
     auto_augment=False
-    freeze=True
+    freeze=False
     weight_decay=0.05 #0.05 for original
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
-    aug_size=4
-    frame_interval=4 #tune samller for more randomness in temproal sampling
+    aug_size=1#
+    frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
-    batch_size=8
-    momentum=0.9 #for SGD only
-    nesterov=True #for SGD only
-    input_batchNorm=True
-    T_0=200*(aug_size+1)//batch_size # optim in step wise 
+    batch_size=4
+    input_batchNorm=False
+
+    momentum=0.9 #for SGD only #
+    nesterov=True #for SGD onl
+    lr_sched=None 
+    T_0=200*(aug_size+1)//batch_size # optim in step wise  for lr scheduler only
     eta_min=1e-6
 
     # load in Vivit and Class_Head
-    model = load_model('./vivit_model.pth',freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
+    model = load_model(pretrain_pth,freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
     parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
     #print(parameters)
     # load in preprocessed Dataset
@@ -334,8 +339,7 @@ if __name__ == "__main__":
     #
     #optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,
     #                     lr=lr, weight_decay=weight_decay)
-    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
-    #lr_sched=None
+    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
     #path for saving the model
@@ -352,7 +356,7 @@ if __name__ == "__main__":
                                                                             criterion, 
                                                                             PATH,
                                                                             clip_value, 
-                                                                            step_log=5)
+                                                                            step_log=10)
 
     #plotting
     plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
