@@ -34,7 +34,7 @@ def drop_out_loop(model,drop_out):
 
 
 # Function to load in model
-def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16,input_batchNorm=False ):
+def load_model(pretrain_pth, custom_weights=None,num_class=2,drop_out=0.2,freeze=False,num_frames=16,input_batchNorm=False ):
     weights_from="kinetics" if pretrain_pth!= None else None
 
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from=weights_from,
@@ -51,15 +51,22 @@ def load_model(pretrain_pth, num_class=2,drop_out=0.2,freeze=False,num_frames=16
 
     cls_head = ClassificationHead(num_classes=num_class, in_channels=768)
     modules=[vivit,cls_head]
+    modules=nn.Sequential(*modules)
+    if custom_weights:
+        missing, unexpected=modules.load_state_dict(torch.load(custom_weights),strict=False)
+        print("missing keys:{}, unexpected:{}".format(missing,unexpected))
+    
     if input_batchNorm:#activate for input normalization along temporal axis
-        modules=[nn.BatchNorm3d(num_frames)]+modules
+        modules=[nn.BatchNorm3d(num_frames)]+[modules]
+        modules = nn.Sequential(*modules)
 
-    model = nn.Sequential(*modules)
+    model=modules
+
     return model.to(device)
 
 
 def concat_train_dataset(train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise,mean,std,num_frames,
-img_size=224,color_jitter=None,):
+img_size=224,color_jitter=None,auto_augment=None):
     #prepare list for all training data
     train_list=[train_dataset]
     #gradually incrase the chance of more augmentation with more augmentation size
@@ -133,7 +140,8 @@ def load_dataset(
         train_dataset=concat_train_dataset(train_dataset,aug_size,temporal_sample,train_ann_path,rotate,hflip,noise,
         mean,std,num_frames,
         img_size=img_size,
-        color_jitter=color_jitter)
+        color_jitter=color_jitter,
+        auto_augment=auto_augment)
 
 
     val_transform = create_video_transform(
@@ -189,7 +197,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
     train_acc_log=[]
     eval_loss_log=[]
     eval_acc_log=[]
-    best_eval_loss=float('inf')
+    best_eval_acc=float('inf')
 
     for ep in range(epochs):
         model.train()
@@ -280,8 +288,8 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 
         #save the model after eval and verify loss dropped:
         #only save the model when it performs better than prev eval loss
-        if eval_loss_log[-1]<best_eval_loss:
-            best_eval_loss=eval_loss_log[-1]
+        if eval_acc_log[-1]>best_eval_acc:
+            best_eval_acc=eval_acc_log[-1]
             saved_path=os.path.join(save_path, "best_model.pth")
             torch.save(model.state_dict(), saved_path)
             print('Model saved in {}'.format(saved_path))
@@ -298,8 +306,9 @@ if __name__ == "__main__":
     np.random.seed(123)
 
     # to add in parser for hyperparameters
-    pretrain_pth=None  #'./vivit_model.pth'
-    ep=20
+    pretrain_pth=None #'./vivit_model.pth'
+    custom_weights='./best_model.pth'
+    ep=80
     clip_value=1 # 0 for disabling grad clip by value
     noise=0 # currently noise disabled
     lr=0.0005
@@ -307,20 +316,20 @@ if __name__ == "__main__":
     freeze=False
     weight_decay=0.05 #0.05 for original
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
-    aug_size=1#
+    aug_size=4
     frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
-    batch_size=4
+    batch_size=8
     input_batchNorm=False
 
-    momentum=0.9 #for SGD only #
-    nesterov=True #for SGD onl
-    lr_sched=None 
+    momentum=0.9 #for SGD only 
+    nesterov=True #for SGD only
     T_0=200*(aug_size+1)//batch_size # optim in step wise  for lr scheduler only
     eta_min=1e-6
+    #lr_sched=None
 
     # load in Vivit and Class_Head
-    model = load_model(pretrain_pth,freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
+    model = load_model(pretrain_pth,custom_weights=custom_weights,freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
     parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
     #print(parameters)
     # load in preprocessed Dataset
@@ -339,7 +348,7 @@ if __name__ == "__main__":
     #
     #optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,
     #                     lr=lr, weight_decay=weight_decay)
-    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
+    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
     criterion = nn.CrossEntropyLoss()
 
     #path for saving the model
