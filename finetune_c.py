@@ -197,7 +197,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
     train_acc_log=[]
     eval_loss_log=[]
     eval_acc_log=[]
-    best_eval_acc=float('inf')
+    best_eval_acc=float('-inf')
 
     for ep in range(epochs):
         model.train()
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     frame_interval=8 #tune samller for more randomness in temproal sampling
     num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
     batch_size=8
-    input_batchNorm=False
+    input_batchNorm=True
 
     momentum=0.9 #for SGD only 
     nesterov=True #for SGD only
