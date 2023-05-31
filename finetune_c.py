@@ -189,6 +189,14 @@ def plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log):
 
     fig.savefig('./loss_acc_graph.jpg')
 
+def plot_lr_loss(lr_rate, batchwise_loss):
+    
+    fig,ax=plt.subplots()
+    ax.plot(lr_rate,batchwise_loss)
+    ax.set_title("Training Loss vs lr rate")
+
+    fig.savefig('./lr_loss.jpg')
+
 def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10):
     # may add accelerator ....
 
@@ -198,6 +206,10 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
     eval_loss_log=[]
     eval_acc_log=[]
     best_eval_acc=float('-inf')
+    #these 2 are to define initial lr
+    batchwise_loss=[]
+    lr_rates=[]
+
 
     for ep in range(epochs):
         model.train()
@@ -213,8 +225,9 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 
             if isinstance(criterion, nn.BCEWithLogitsLoss):
                 outputs=torch.squeeze(outputs)
+                labels=labels.float()
                 
-            loss = criterion(outputs, labels.float())
+            loss = criterion(outputs, labels)
 
             # BP and optimize
             with torch.autograd.set_detect_anomaly(False):
@@ -251,6 +264,9 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             train_correct += batch_correct
             train_total += labels.size(0)
 
+            #this is to find the initial lr 
+            lr_rates.append(optimizer.param_groups[0]["lr"])
+            batchwise_loss.append(batch_loss)
             #lr scheduler update (step)
             if lr_sched is not None:
                 lr_sched.step()
@@ -283,9 +299,19 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
                 eval_labels = eval_labels.to(device)
 
                 preds = model(eval_inputs)
+
+                if isinstance(criterion,nn.BCEWithLogitsLoss): #special handling for BCE
+                    preds=torch.squeeze(preds)
+                    pred_logits=torch.zeros(eval_labels.size())
+                    pred_logits[nn.functional.sigmoid(preds.detach().cpu())>0.5]=1
+                    eval_labels=eval_labels.float()
+                else:
+                    pred_logits = torch.argmax(preds.detach(), 1).cpu()
+
+
                 eval_loss += criterion(preds, eval_labels).item()
                 eval_labels = eval_labels.cpu()
-                eval_correct += torch.sum(torch.argmax(preds.detach(), 1).cpu() == eval_labels).item()
+                eval_correct += torch.sum(pred_logits == eval_labels).item()
                 eval_total += eval_labels.size(0)
 
                 print("Eval Progress:{}/{}".format(eval_step + 1, len(val_loader)))
@@ -306,9 +332,34 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
         
         
         plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
+        #to plot graph for the learning rate and loss relationship
+        plot_lr_loss(lr_rates, batchwise_loss)
     
     return train_loss_log,train_acc_log,eval_loss_log,eval_acc_log
 
+def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only 
+    nesterov=True, #for SGD only
+    T_0=None, # optim in step wise  for lr scheduler only
+    eta_min=None,
+    ep=None,
+    weight_decay=None):
+
+    if option=='adam':
+        optimizer = optim.AdamW(parameters, betas=(0.9, 0.999), lr=lr, weight_decay=weight_decay)
+    else:
+        optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,lr=lr, weight_decay=weight_decay)
+
+    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
+    #this is find the best initial learning rate
+    lower_bound=1e-7
+    upper_bound=10
+    increment=np.exp(np.log(upper_bound/lower_bound)/(T_0*ep))
+    print("the lr would increment by step with {}".format(increment))
+    lambda1= lambda step: increment**step
+    lr_sched= optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda1)
+
+
+    return optimizer,lr_sched
 
 if __name__ == "__main__":
     torch.manual_seed(123)
@@ -316,11 +367,11 @@ if __name__ == "__main__":
 
     # Basic Hyperparameters
     loss_fnc="bce" 
-    pretrain_pth='./vivit_model.pth'
+    pretrain_pth=None #'./vivit_model.pth'
     custom_weights=None #'./best_model.pth'
-    ep=80
+    ep=40
     clip_value=1 # 0 for disabling grad clip by value
-    lr=0.0005
+    lr=1e-7 #for finding initial rate
     freeze=False
 
     #overfitting control
@@ -328,13 +379,14 @@ if __name__ == "__main__":
     auto_augment=False
     weight_decay=0.05 #0.05 for original
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
-    aug_size=4
+    aug_size=1
     frame_interval=8 #tune samller for more randomness in temproal sampling
     batch_size=4
     input_batchNorm=True
     num_frames=16 #strictly unchageable
 
-
+    #optimizer and lr sched
+    options="adam"
     momentum=0.9 #for SGD only 
     nesterov=True #for SGD only
     T_0=200*(aug_size+1)//batch_size # optim in step wise  for lr scheduler only
@@ -359,10 +411,13 @@ if __name__ == "__main__":
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, batch_size=batch_size)
 
     #define optimizer and loss function
-    optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=lr, weight_decay=weight_decay)
-    #optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,lr=lr, weight_decay=weight_decay)
+    optimizer,lr_sched = optimizer_options(options,lr,parameters,momentum=momentum ,#for SGD only 
+    nesterov=nesterov, #for SGD only
+    T_0=T_0, # optim in step wise  for lr scheduler only
+    eta_min=eta_min,
+    ep=ep,
+    weight_decay=weight_decay)
 
-    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
     
     criterion = nn.BCEWithLogitsLoss() if loss_fnc=="bce" else nn.CrossEntropyLoss()
 
