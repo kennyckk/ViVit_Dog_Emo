@@ -418,5 +418,6 @@ if __name__=="__main__":
 				 transform=transform,
 				 temporal_sample=train_temporal_sample)
 
-	sample=next(iter(sample_videos))[0]
-	show_processed_image(sample.permute(0,2,3,1),'./dummies/',mean=(0.45, 0.45, 0.45),std=(0.225, 0.225, 0.225))
+	sample=next(iter(sample_videos))[1]
+	print(sample)
+	#show_processed_image(sample.permute(0,2,3,1),'./dummies/',mean=(0.45, 0.45, 0.45),std=(0.225, 0.225, 0.225))

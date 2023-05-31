@@ -209,7 +209,12 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 
             # forward pass
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            
+
+            if isinstance(criterion, nn.BCEWithLogitsLoss):
+                outputs=torch.squeeze(outputs)
+                
+            loss = criterion(outputs, labels.float())
 
             # BP and optimize
             with torch.autograd.set_detect_anomaly(False):
@@ -236,7 +241,11 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             # calculate metrices
             batch_loss = loss.item()
             total_loss += batch_loss
-            logits = torch.argmax(outputs.detach(), 1).cpu()
+            if isinstance(criterion,nn.BCEWithLogitsLoss): #special handling for BCE
+                logits=torch.zeros(labels.size())
+                logits[nn.functional.sigmoid(outputs.detach().cpu())>0.5]=1
+            else:
+                logits = torch.argmax(outputs.detach(), 1).cpu()
             labels = labels.cpu()
             batch_correct = torch.sum(logits == labels).item()
             train_correct += batch_correct
@@ -295,8 +304,8 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             print('Model saved in {}'.format(saved_path))
             print(f'the model saved obtained in ep {ep+1}')
         
-        if ep>=10:
-            plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
+        
+        plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
     
     return train_loss_log,train_acc_log,eval_loss_log,eval_acc_log
 
@@ -305,31 +314,37 @@ if __name__ == "__main__":
     torch.manual_seed(123)
     np.random.seed(123)
 
-    # to add in parser for hyperparameters
-    pretrain_pth=None #'./vivit_model.pth'
-    custom_weights='./best_model.pth'
+    # Basic Hyperparameters
+    loss_fnc="bce" 
+    pretrain_pth='./vivit_model.pth'
+    custom_weights=None #'./best_model.pth'
     ep=80
     clip_value=1 # 0 for disabling grad clip by value
-    noise=0 # currently noise disabled
     lr=0.0005
-    auto_augment=False
     freeze=False
+
+    #overfitting control
+    noise=0 # currently noise disabled
+    auto_augment=False
     weight_decay=0.05 #0.05 for original
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
     aug_size=4
     frame_interval=8 #tune samller for more randomness in temproal sampling
-    num_frames=16 #strictly 16 and cant change due to pre-trained Vivit K400
-    batch_size=8
+    batch_size=4
     input_batchNorm=True
+    num_frames=16 #strictly unchageable
+
 
     momentum=0.9 #for SGD only 
     nesterov=True #for SGD only
     T_0=200*(aug_size+1)//batch_size # optim in step wise  for lr scheduler only
     eta_min=1e-6
-    #lr_sched=None
+    lr_sched=None
+
+    num_class=1 if loss_fnc=="bce" else 2
 
     # load in Vivit and Class_Head
-    model = load_model(pretrain_pth,custom_weights=custom_weights,freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
+    model = load_model(pretrain_pth,custom_weights=custom_weights,num_class=num_class,freeze=freeze,drop_out=drop_out,num_frames=num_frames,input_batchNorm=input_batchNorm)
     parameters= filter(lambda p: p.requires_grad,model.parameters()) #only need those trainable params
     #print(parameters)
     # load in preprocessed Dataset
@@ -345,11 +360,11 @@ if __name__ == "__main__":
 
     #define optimizer and loss function
     optimizer = optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=lr, weight_decay=weight_decay)
-    #
-    #optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,
-    #                     lr=lr, weight_decay=weight_decay)
-    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
-    criterion = nn.CrossEntropyLoss()
+    #optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,lr=lr, weight_decay=weight_decay)
+
+    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
+    
+    criterion = nn.BCEWithLogitsLoss() if loss_fnc=="bce" else nn.CrossEntropyLoss()
 
     #path for saving the model
     PATH = "./saved_model"  # folder to save the model
