@@ -41,10 +41,10 @@ def load_model(pretrain_pth, custom_weights=None,num_class=2,drop_out=0.2,freeze
                   img_size=224,
                   num_frames=num_frames,
                   attention_type='fact_encoder',
-                  dropout_p=drop_out)
+                  dropout_p=0)
     # to change the activate the drop out layer in each transformer layer
-    # if drop_out>0:
-    #     drop_out_loop(vivit,drop_out)
+    if drop_out>0:
+        drop_out_loop(vivit,drop_out)
     
     if freeze:
         vivit=freeze_layers(vivit)
@@ -65,17 +65,19 @@ def load_model(pretrain_pth, custom_weights=None,num_class=2,drop_out=0.2,freeze
     return model.to(device)
 
 
-def concat_train_dataset(train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise,mean,std,num_frames,
-img_size=224,color_jitter=None,auto_augment=None):
+def concat_train_dataset(train_dataset,aug_size,path,rotate,hflip,noise,mean,std,num_frames,
+img_size=224,color_jitter=None,auto_augment=None,temporal_random=False,frame_interval=8):
     #prepare list for all training data
     train_list=[train_dataset]
     #gradually incrase the chance of more augmentation with more augmentation size
     rotate_values=np.linspace(rotate,1,aug_size) 
     hflip_values=np.linspace(hflip,1,aug_size)
-    noise_values=np.linspace(noise,0.5,aug_size)
+    noise_values=np.linspace(0,noise,aug_size) #noise is the upper bound prob
 
     #instantiate multiple dataset object with augmented data
     for i in range(aug_size):
+            temporal_sample=TemporalRandomCrop(num_frames * frame_interval,temporal_random=temporal_random)
+
             aug_train_transform= transforms_train_dog(img_size=img_size,
                         augmentation=True,
                         crop_pct=None,
@@ -86,7 +88,7 @@ img_size=224,color_jitter=None,auto_augment=None):
                         std=std,
                         rotate=rotate_values[i],
                         hflip=hflip_values[i], # 0 for non-augment data
-                        noise=0)#noise_values[i])
+                        noise=noise_values[i])
 
             aug_train_dataset = DogDataset(path, transform=aug_train_transform, temporal_sample=temporal_sample,num_frames=num_frames)
             train_list.append(aug_train_dataset)
@@ -106,7 +108,8 @@ def load_dataset(
         frame_interval=8,
         hflip=0.8,
         noise=0.2,
-        rotate=0.3
+        rotate=0.3,
+        temporal_random=False
         ):
     color_jitter = 0.4
     scale = None
@@ -121,7 +124,7 @@ def load_dataset(
 
     # prepare transformation for train and eval datasets accordingly
     temporal_sample = TemporalRandomCrop(
-        num_frames * frame_interval)
+        num_frames * num_frames, full_length=True) #make the frame interval large enough for most videos in intial train and eval
 
     train_transform = transforms_train_dog(img_size=img_size,
                     augmentation=False,
@@ -137,11 +140,13 @@ def load_dataset(
         
         #train_dataset,aug_size,temporal_sample,path,rotate,hflip,noise
         #concatenate more augmented dataset
-        train_dataset=concat_train_dataset(train_dataset,aug_size,temporal_sample,train_ann_path,rotate,hflip,noise,
+        train_dataset=concat_train_dataset(train_dataset,aug_size,train_ann_path,rotate,hflip,noise,
         mean,std,num_frames,
         img_size=img_size,
         color_jitter=color_jitter,
-        auto_augment=auto_augment)
+        auto_augment=auto_augment,
+        temporal_random=temporal_random,
+        frame_interval=frame_interval)
 
 
     val_transform = create_video_transform(
@@ -192,6 +197,8 @@ def plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log):
 def plot_lr_loss(lr_rate, batchwise_loss):
     
     fig,ax=plt.subplots()
+    ax.set_xscale('log')
+    ax.set_yscale('log')
     ax.plot(lr_rate,batchwise_loss)
     ax.set_title("Training Loss vs lr rate")
 
@@ -352,7 +359,7 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
     #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
     #this is find the best initial learning rate
     lower_bound=1e-7
-    upper_bound=10
+    upper_bound=1e-1
     increment=np.exp(np.log(upper_bound/lower_bound)/(T_0*ep))
     print("the lr would increment by step with {}".format(increment))
     lambda1= lambda step: increment**step
@@ -375,12 +382,13 @@ if __name__ == "__main__":
     freeze=False
 
     #overfitting control
-    noise=0 # currently noise disabled
+    noise=0 # upperbound for noise prob
     auto_augment=False
     weight_decay=0.05 #0.05 for original
     drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
     aug_size=1
     frame_interval=8 #tune samller for more randomness in temproal sampling
+    temporal_random=True
     batch_size=4
     input_batchNorm=True
     num_frames=16 #strictly unchageable
@@ -406,7 +414,8 @@ if __name__ == "__main__":
                                               auto_augment=auto_augment,
                                               aug_size=aug_size,
                                               frame_interval=frame_interval,
-                                              num_frames=num_frames)
+                                              num_frames=num_frames,
+                                              temporal_random=temporal_random)
     # load them to Data Loader
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, batch_size=batch_size)
 

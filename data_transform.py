@@ -596,13 +596,27 @@ class TemporalRandomCrop(object):
 		size (int): Desired length of frames will be seen in the model.
 	"""
 
-	def __init__(self, size):
+	def __init__(self, size,temporal_random=False,full_length=False):
 		self.size = size
+		self.temporal_random=temporal_random
+		self.full_length=full_length
+		assert not (self.temporal_random==True and self.full_length==True), "both temproal random and full length cannot be true"
 
 	def __call__(self, total_frames):
-		rand_end = max(0, total_frames - self.size - 1)
-		begin_index = random.randint(0, rand_end)
-		end_index = min(begin_index + self.size, total_frames)
+		if self.temporal_random: #increase the range of frames capturable
+			lowest=16
+			length=int(np.log(self.size//lowest)/np.log(2))
+			frames_choice=[int(lowest*2**i) for i in range(length+1)]
+			chosen_size=np.random.choice(frames_choice,1)
+			self.size=chosen_size
+
+		if not self.full_length:
+			rand_end = max(0, total_frames - self.size - 1)
+			begin_index = random.randint(0, rand_end)
+			end_index = min(begin_index + self.size, total_frames)
+		else: #not depend on size
+			begin_index=0
+			end_index=total_frames
 		return begin_index, end_index
 
 
