@@ -6,11 +6,12 @@ from torchmetrics import Accuracy
 from tqdm.auto import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
 from video_transformer import ViViT
 from transformer import ClassificationHead
 from data_transform import create_video_transform, TemporalRandomCrop,transforms_train_dog,transforms_eval
-from dataset import DogDataset
+from dataset import DogDataset,skip_bad_collate
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
@@ -168,11 +169,13 @@ def load_DataLoader(train_dataset, val_dataset, batch_size, num_worker=0):
                                              batch_size=batch_size,
                                              num_workers=num_worker,
                                              shuffle=True,
-                                             pin_memory=True)
+                                             pin_memory=True,
+                                             collate_fn=skip_bad_collate)
     val_DataLoader = utils.data.DataLoader(val_dataset,
                                            batch_size=batch_size,
                                            num_workers=num_worker,
-                                           shuffle=False, )
+                                           shuffle=False,
+                                           collate_fn=skip_bad_collate )
     return train_DataLoader, val_DataLoader
 
 
@@ -214,8 +217,8 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
     eval_acc_log=[]
     best_eval_acc=float('-inf')
     #these 2 are to define initial lr
-    batchwise_loss=[]
-    lr_rates=[]
+    #batchwise_loss=[]
+    #lr_rates=[]
 
 
     for ep in range(epochs):
@@ -272,11 +275,12 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             train_total += labels.size(0)
 
             #this is to find the initial lr 
-            lr_rates.append(optimizer.param_groups[0]["lr"])
-            batchwise_loss.append(batch_loss)
+            #lr_rates.append(optimizer.param_groups[0]["lr"])
+            #batchwise_loss.append(batch_loss)
             #lr scheduler update (step)
-            if lr_sched is not None:
-                lr_sched.step()
+            # if lr_sched is not None:
+            #     lr_sched.step()
+
             # Monitor Progress
             if step % step_log == 0:  # print accuracy and loss every 10 steps
                 print("current progress are ep{}: {}/{}".format(ep,step+1,len(train_loader)))
@@ -285,7 +289,8 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
                 print("current learning rate is {}".format(optimizer.param_groups[0]["lr"]))
             progress_bar.update(1)
         #lr scheduler update (ep)
-        #lr_sched.step()
+        if lr_sched is not None:
+            lr_sched.step()
 
         # Show results of this train epoch
         train_acc=train_correct / train_total
@@ -340,7 +345,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
         
         plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
         #to plot graph for the learning rate and loss relationship
-        plot_lr_loss(lr_rates, batchwise_loss)
+        #plot_lr_loss(lr_rates, batchwise_loss)
     
     return train_loss_log,train_acc_log,eval_loss_log,eval_acc_log
 
@@ -356,14 +361,24 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
     else:
         optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,lr=lr, weight_decay=weight_decay)
 
+    #exponential LR rate
+    lower_bound=6.67e-7
+    upper_bound=lr
+    gamma=np.exp(np.log(lower_bound/upper_bound)/ep)
+    lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
+    print("the lr would increment by step with {}".format(gamma))
+
     #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
-    #this is find the best initial learning rate
-    lower_bound=1e-7
-    upper_bound=1e-1
-    increment=np.exp(np.log(upper_bound/lower_bound)/(T_0*ep))
-    print("the lr would increment by step with {}".format(increment))
-    lambda1= lambda step: increment**step
-    lr_sched= optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda1)
+
+    #this is to find the best initial learning rate
+    # lower_bound=1e-7
+    # upper_bound=1e-1
+    # increment=np.exp(np.log(upper_bound/lower_bound)/(T_0*ep))
+    # print("the lr would increment by step with {}".format(increment))
+    # lambda1= lambda step: increment**step
+    # lr_sched= optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda1)
+
+    #lr_sched=None
 
 
     return optimizer,lr_sched
@@ -371,22 +386,23 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
 if __name__ == "__main__":
     torch.manual_seed(123)
     np.random.seed(123)
+    random.seed(123)
 
     # Basic Hyperparameters
     loss_fnc="bce" 
-    pretrain_pth=None #'./vivit_model.pth'
+    pretrain_pth='./vivit_model.pth'
     custom_weights=None #'./best_model.pth'
-    ep=40
+    ep=160
     clip_value=1 # 0 for disabling grad clip by value
-    lr=1e-7 #for finding initial rate
+    lr=1.5e-4 
     freeze=False
 
     #overfitting control
-    noise=0 # upperbound for noise prob
+    noise=0.1 # upperbound for noise prob
     auto_augment=False
-    weight_decay=0.05 #0.05 for original
-    drop_out=0 #i.e. no transfrom layer drop out/ only embed drop out
-    aug_size=1
+    weight_decay=0.2 #0.05 for original
+    drop_out=0.5 #i.e. transform layer drop out only
+    aug_size=4
     frame_interval=8 #tune samller for more randomness in temproal sampling
     temporal_random=True
     batch_size=4
@@ -399,7 +415,7 @@ if __name__ == "__main__":
     nesterov=True #for SGD only
     T_0=200*(aug_size+1)//batch_size # optim in step wise  for lr scheduler only
     eta_min=1e-6
-    lr_sched=None
+    #lr_sched=None
 
     num_class=1 if loss_fnc=="bce" else 2
 

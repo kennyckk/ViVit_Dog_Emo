@@ -161,6 +161,10 @@ class DecordInit(object):
 					f'num_threads={self.num_threads})')
 		return repr_str
 
+def skip_bad_collate (batch):
+	batch=list(filter(lambda x: x is not None, batch))
+	return torch.utils.data.dataloader.default_collate(batch)
+
 class DogDataset(torch.utils.data.Dataset):
 	"""Load the Dog Video Files"""
 	def __init__(self,
@@ -200,8 +204,9 @@ class DogDataset(torch.utils.data.Dataset):
 				del v_reader
 				break
 			except Exception as e:
-				print(e)
-				index = random.randint(0, len(self.data) - 1)
+				print(e, 'skipping this data instance')
+				#index = random.randint(0, len(self.data) - 1)
+				return None
 
 		# Video align transform: T C H W
 		with torch.no_grad():
@@ -393,14 +398,14 @@ if __name__=="__main__":
 	from utils import show_processed_image
 
 	train_temporal_sample = T.TemporalRandomCrop(
-    16 * 16)
+    16 * 16,full_length=True)
 
 	transform= T.transforms_train_dog(img_size=224,
                     augmentation=True,
 					crop_pct=None,
-					 hflip=0.6, # 0 for non-augment data
+					 hflip=1, # 0 for non-augment data
 					 auto_augment=None,
-					 interpolation='bicubic',
+					 interpolation='bilinear',
 					 rotate=1,
 					 noise=1
 					 )
@@ -418,6 +423,6 @@ if __name__=="__main__":
 				 transform=transform,
 				 temporal_sample=train_temporal_sample)
 
-	sample=next(iter(sample_videos))[1]
-	print(sample)
-	#show_processed_image(sample.permute(0,2,3,1),'./dummies/',mean=(0.45, 0.45, 0.45),std=(0.225, 0.225, 0.225))
+	sample=next(iter(sample_videos))[0]
+	#print(sample)
+	show_processed_image(sample.permute(0,2,3,1),'./dummies/',mean=(0.45, 0.45, 0.45),std=(0.225, 0.225, 0.225))

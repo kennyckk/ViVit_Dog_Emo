@@ -8,3 +8,5 @@ lightning_logs/
 saved_model/
 face_data/videos
 dummies/
+best_model.pth
+data_test/
