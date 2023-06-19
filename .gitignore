@@ -10,3 +10,4 @@ face_data/videos
 dummies/
 best_model.pth
 data_test/
+find_initialLR.py

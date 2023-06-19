@@ -12,6 +12,7 @@ from video_transformer import ViViT
 from transformer import ClassificationHead
 from data_transform import create_video_transform, TemporalRandomCrop,transforms_train_dog,transforms_eval
 from dataset import DogDataset,skip_bad_collate
+from train_utils import Save_Multi_Models
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
@@ -211,11 +212,12 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
     # may add accelerator ....
 
     progress_bar = tqdm(range(epochs * len(train_loader)))
+    save_multi_models=Save_Multi_Models(save_path)
     train_loss_log=[]
     train_acc_log=[]
     eval_loss_log=[]
     eval_acc_log=[]
-    best_eval_acc=float('-inf')
+    #best_eval_acc=float('-inf')
     #these 2 are to define initial lr
     #batchwise_loss=[]
     #lr_rates=[]
@@ -335,17 +337,21 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 
         #save the model after eval and verify loss dropped:
         #only save the model when it performs better than prev eval loss
-        if eval_acc_log[-1]>best_eval_acc:
-            best_eval_acc=eval_acc_log[-1]
-            saved_path=os.path.join(save_path, "best_model.pth")
-            torch.save(model.state_dict(), saved_path)
-            print('Model saved in {}'.format(saved_path))
-            print(f'the model saved obtained in ep {ep+1}')
+        # if eval_acc_log[-1]>best_eval_acc:
+        #     best_eval_acc=eval_acc_log[-1]
+        #     saved_path=os.path.join(save_path, "best_model.pth")
+        #     torch.save(model.state_dict(), saved_path)
+        #     print('Model saved in {}'.format(saved_path))
+        #     print(f'the model saved obtained in ep {ep+1}')
         
-        
+        #to save multiple model for ensembles only on specific ep intervals for cosine warm up lr sched
+        if (ep+1)% T_0==0:
+            save_multi_models.check_best_n(eval_acc_log[-1],model,step)
+            
         plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
         #to plot graph for the learning rate and loss relationship
         #plot_lr_loss(lr_rates, batchwise_loss)
+    save_multi_models.model_maps()
     
     return train_loss_log,train_acc_log,eval_loss_log,eval_acc_log
 
@@ -354,7 +360,7 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
     T_0=None, # optim in step wise  for lr scheduler only
     eta_min=None,
     ep=None,
-    weight_decay=None):
+    weight_decay=None,):
 
     if option=='adam':
         optimizer = optim.AdamW(parameters, betas=(0.9, 0.999), lr=lr, weight_decay=weight_decay)
@@ -362,13 +368,13 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
         optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,lr=lr, weight_decay=weight_decay)
 
     #exponential LR rate
-    lower_bound=6.67e-7
-    upper_bound=lr
-    gamma=np.exp(np.log(lower_bound/upper_bound)/ep)
-    lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
-    print("the lr would increment by step with {}".format(gamma))
+    # lower_bound=6.67e-7
+    # upper_bound=lr
+    # gamma=np.exp(np.log(lower_bound/upper_bound)/ep)
+    # lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
+    # print("the lr would increment by step with {}".format(gamma))
 
-    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
+    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
 
     #this is to find the best initial learning rate
     # lower_bound=1e-7
@@ -392,17 +398,17 @@ if __name__ == "__main__":
     loss_fnc="bce" 
     pretrain_pth='./vivit_model.pth'
     custom_weights=None #'./best_model.pth'
-    ep=160
+    ep=120
     clip_value=1 # 0 for disabling grad clip by value
-    lr=1.5e-4 
+    lr=5e-5 
     freeze=False
 
     #overfitting control
-    noise=0.1 # upperbound for noise prob
+    noise=0.2 # upperbound for noise prob
     auto_augment=False
-    weight_decay=0.2 #0.05 for original
-    drop_out=0.5 #i.e. transform layer drop out only
-    aug_size=4
+    weight_decay=0.05 #0.05 for original
+    drop_out=0 #i.e. transform layer drop out only
+    aug_size=3
     frame_interval=8 #tune samller for more randomness in temproal sampling
     temporal_random=True
     batch_size=4
@@ -410,11 +416,11 @@ if __name__ == "__main__":
     num_frames=16 #strictly unchageable
 
     #optimizer and lr sched
-    options="adam"
+    options="sgd"
     momentum=0.9 #for SGD only 
     nesterov=True #for SGD only
-    T_0=200*(aug_size+1)//batch_size # optim in step wise  for lr scheduler only
-    eta_min=1e-6
+    T_0=20 # optim in ep wise  for lr scheduler only
+    eta_min=1e-7
     #lr_sched=None
 
     num_class=1 if loss_fnc=="bce" else 2
