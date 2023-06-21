@@ -709,6 +709,10 @@ def transforms_train_dog(img_size=224,
 		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
 		### to add rotation 
 		secondary_tfl+=[Custom_Rotation((-180,180),prob=rotate)] #rotation 
+		# add translation
+		secondary_tfl+=[transforms.RandomApply(torch.nn.ModuleList([transforms.RandomAffine(0,(0.2,0.2))]),p=hflip)]
+		# add Gaussian Blur
+		secondary_tfl+=[transforms.RandomApply(torch.nn.ModuleList([transforms.GaussianBlur((3,3),(0.1,1))]),p=noise)]
 		
 
 

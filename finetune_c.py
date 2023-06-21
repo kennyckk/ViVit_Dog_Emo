@@ -7,6 +7,7 @@ from tqdm.auto import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import wandb
 
 from video_transformer import ViViT
 from transformer import ClassificationHead
@@ -208,7 +209,7 @@ def plot_lr_loss(lr_rate, batchwise_loss):
 
     fig.savefig('./lr_loss.jpg')
 
-def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10):
+def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10,T_0=None,T_mul=1):
     # may add accelerator ....
 
     progress_bar = tqdm(range(epochs * len(train_loader)))
@@ -217,6 +218,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
     train_acc_log=[]
     eval_loss_log=[]
     eval_acc_log=[]
+    last_restart=0
     #best_eval_acc=float('-inf')
     #these 2 are to define initial lr
     #batchwise_loss=[]
@@ -290,17 +292,14 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
                 print("the training accuracy for this batch: {}".format(batch_correct / labels.size(0)))
                 print("current learning rate is {}".format(optimizer.param_groups[0]["lr"]))
             progress_bar.update(1)
-        #lr scheduler update (ep)
-        if lr_sched is not None:
-            lr_sched.step()
-
+        
         # Show results of this train epoch
         train_acc=train_correct / train_total
         print(" epoch{}: average accuracy:{}; total loss:{}".format(ep + 1, train_acc, total_loss))
         # append to train_loss list for plotting
-        train_loss_log.append(total_loss/len(train_loader))
-        train_acc_log.append(train_acc)
-
+        train_loss_ep=total_loss/len(train_loader)
+        train_loss_log.append(train_loss_ep)
+        train_acc_log.append(train_acc)        
 
         # to do eval per epoch end
         print("Evaluation for ep{} start!".format(ep + 1))
@@ -331,10 +330,22 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
                 print("Eval Progress:{}/{}".format(eval_step + 1, len(val_loader)))
         eval_accuracy = eval_correct / eval_total
         #to log the loss eval for this ep for plotting
+        eval_loss_ep=eval_loss/len(val_loader)
         eval_loss_log.append(eval_loss/len(val_loader))
         eval_acc_log.append(eval_accuracy)
         print("the eval accuracy:{}; eval loss:{}".format(eval_accuracy, eval_loss))
+        #wandb to log
+        experiment.log({
+            'training_loss':train_loss_ep,
+            'training_accuracy':train_acc,
+            'learning_rate':optimizer.param_groups[0]["lr"],
+            'epochs':ep,
+            'eval_loss':eval_loss_ep,
+            'eval accuracy':eval_accuracy,})
 
+        #lr scheduler update (ep)
+        if lr_sched is not None:
+            lr_sched.step()
         #save the model after eval and verify loss dropped:
         #only save the model when it performs better than prev eval loss
         # if eval_acc_log[-1]>best_eval_acc:
@@ -345,8 +356,12 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
         #     print(f'the model saved obtained in ep {ep+1}')
         
         #to save multiple model for ensembles only on specific ep intervals for cosine warm up lr sched
-        if (ep+1)% T_0==0:
-            save_multi_models.check_best_n(eval_acc_log[-1],model,step)
+        
+        if (ep+1)% (T_0+last_restart)==0:
+            save_multi_models.check_best_n(eval_accuracy,model,ep)
+            if T_mul!=1:
+                last_restart+=T_0
+                T_0*=T_mul
             
         plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
         #to plot graph for the learning rate and loss relationship
@@ -358,6 +373,7 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
 def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only 
     nesterov=True, #for SGD only
     T_0=None, # optim in step wise  for lr scheduler only
+    T_mul=1,
     eta_min=None,
     ep=None,
     weight_decay=None,):
@@ -374,7 +390,7 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
     # lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
     # print("the lr would increment by step with {}".format(gamma))
 
-    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=eta_min,last_epoch=-1)
+    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mul, eta_min=eta_min,last_epoch=-1)
 
     #this is to find the best initial learning rate
     # lower_bound=1e-7
@@ -398,17 +414,17 @@ if __name__ == "__main__":
     loss_fnc="bce" 
     pretrain_pth='./vivit_model.pth'
     custom_weights=None #'./best_model.pth'
-    ep=120
+    ep=160
     clip_value=1 # 0 for disabling grad clip by value
-    lr=5e-5 
+    lr=1.5e-4 
     freeze=False
 
     #overfitting control
-    noise=0.2 # upperbound for noise prob
+    noise=0.1 # upperbound for noise prob
     auto_augment=False
-    weight_decay=0.05 #0.05 for original
-    drop_out=0 #i.e. transform layer drop out only
-    aug_size=3
+    weight_decay=0.2 #0.05 for original
+    drop_out=0.5 #i.e. transform layer drop out only
+    aug_size=4
     frame_interval=8 #tune samller for more randomness in temproal sampling
     temporal_random=True
     batch_size=4
@@ -416,12 +432,33 @@ if __name__ == "__main__":
     num_frames=16 #strictly unchageable
 
     #optimizer and lr sched
-    options="sgd"
+    options="adam"
     momentum=0.9 #for SGD only 
     nesterov=True #for SGD only
-    T_0=20 # optim in ep wise  for lr scheduler only
-    eta_min=1e-7
+    T_0=10 # optim in ep wise  for cosine warmup only
+    eta_min=1e-7 # optim in ep wise  for cosine warmup only
+    T_mul=2
     #lr_sched=None
+
+    experiment= wandb.init(project='ViVit_Dog_SGD',resume='allow', anonymous='allow')
+    experiment.config.update(dict(
+        ep=80,
+        lr=2e-3,
+        noise=0.1, # upperbound for noise prob
+        weight_decay=0.2, #0.05 for original
+        drop_out=0.5, #i.e. transform layer drop out only
+        aug_size=3,
+        frame_interval=8, #tune samller for more randomness in temproal sampling
+        temporal_random=True,
+        batch_size=4,
+        input_batchNorm=True,
+        optimizer="sgd",
+        momentum=0.9, #for SGD only 
+        nesterov=True, #for SGD only
+        T_0=20, # optim in ep wise  for cosine warmup only
+        eta_min=1e-5 # optim in ep wise  for cosine warmup only
+        #lr_sched=None
+    ))
 
     num_class=1 if loss_fnc=="bce" else 2
 
@@ -445,6 +482,7 @@ if __name__ == "__main__":
     optimizer,lr_sched = optimizer_options(options,lr,parameters,momentum=momentum ,#for SGD only 
     nesterov=nesterov, #for SGD only
     T_0=T_0, # optim in step wise  for lr scheduler only
+    T_mul=T_mul,
     eta_min=eta_min,
     ep=ep,
     weight_decay=weight_decay)
@@ -466,7 +504,10 @@ if __name__ == "__main__":
                                                                             criterion, 
                                                                             PATH,
                                                                             clip_value, 
-                                                                            step_log=10)
+                                                                            step_log=10,
+                                                                            T_0=T_0,
+                                                                            T_mul=T_mul
+                                                                            )
 
     #plotting
     plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
