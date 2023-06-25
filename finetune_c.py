@@ -13,7 +13,7 @@ from video_transformer import ViViT
 from transformer import ClassificationHead
 from data_transform import create_video_transform, TemporalRandomCrop,transforms_train_dog,transforms_eval
 from dataset import DogDataset,skip_bad_collate
-from train_utils import Save_Multi_Models
+from train_utils import Save_Multi_Models, multi_views_model
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
@@ -69,7 +69,7 @@ def load_model(pretrain_pth, custom_weights=None,num_class=2,drop_out=0.2,freeze
 
 
 def concat_train_dataset(train_dataset,aug_size,path,rotate,hflip,noise,mean,std,num_frames,
-img_size=224,color_jitter=None,auto_augment=None,temporal_random=False,frame_interval=8):
+img_size=224,color_jitter=None,auto_augment=None,temporal_random=False,frame_interval=8,all_frames=128):
     #prepare list for all training data
     train_list=[train_dataset]
     #gradually incrase the chance of more augmentation with more augmentation size
@@ -93,7 +93,8 @@ img_size=224,color_jitter=None,auto_augment=None,temporal_random=False,frame_int
                         hflip=hflip_values[i], # 0 for non-augment data
                         noise=noise_values[i])
 
-            aug_train_dataset = DogDataset(path, transform=aug_train_transform, temporal_sample=temporal_sample,num_frames=num_frames)
+            aug_train_dataset = DogDataset(path, transform=aug_train_transform, temporal_sample=temporal_sample,num_frames=num_frames,
+            all_frames=all_frames)
             train_list.append(aug_train_dataset)
 
     return utils.data.ConcatDataset(train_list)
@@ -109,10 +110,11 @@ def load_dataset(
         auto_augment=None,
         num_frames=16,
         frame_interval=8,
-        hflip=0.8,
+        hflip=0.2,
         noise=0.2,
-        rotate=0.3,
-        temporal_random=False
+        rotate=0.2,
+        temporal_random=False,
+        all_frames=128
         ):
     color_jitter = 0.4
     scale = None
@@ -137,7 +139,8 @@ def load_dataset(
 					 interpolation='bicubic',
 					 mean=mean,
 					 std=std,)
-    train_dataset = DogDataset(train_ann_path, transform=train_transform, temporal_sample=temporal_sample,num_frames=num_frames)
+    train_dataset = DogDataset(train_ann_path, transform=train_transform, temporal_sample=temporal_sample,num_frames=num_frames,
+    all_frames=all_frames)
     # to implement additional augmentation
     if aug_size>0:
         
@@ -149,7 +152,8 @@ def load_dataset(
         color_jitter=color_jitter,
         auto_augment=auto_augment,
         temporal_random=temporal_random,
-        frame_interval=frame_interval)
+        frame_interval=frame_interval,
+        all_frames=all_frames)
 
 
     val_transform = create_video_transform(
@@ -160,7 +164,8 @@ def load_dataset(
         std=std)
 
     # use the dataset class to load in DAtaset Obj
-    val_dataset = DogDataset(val_ann_path, transform=val_transform, temporal_sample=temporal_sample,num_frames=num_frames)
+    val_dataset = DogDataset(val_ann_path, transform=val_transform, temporal_sample=temporal_sample,num_frames=num_frames,
+    all_frames=all_frames)
     
 
     return train_dataset, val_dataset
@@ -209,7 +214,8 @@ def plot_lr_loss(lr_rate, batchwise_loss):
 
     fig.savefig('./lr_loss.jpg')
 
-def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10,T_0=None,T_mul=1):
+def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10,T_0=None,T_mul=1,
+multi_view=True,save_multiples=False):
     # may add accelerator ....
 
     progress_bar = tqdm(range(epochs * len(train_loader)))
@@ -234,11 +240,11 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
             labels = labels.to(device)
 
             # forward pass
-            outputs = model(inputs)
+            outputs = model(inputs) if not multi_view else multi_views_model(model,inputs)
             
 
             if isinstance(criterion, nn.BCEWithLogitsLoss):
-                outputs=torch.squeeze(outputs)
+                outputs=torch.squeeze(outputs,dim=-1)
                 labels=labels.float()
                 
             loss = criterion(outputs, labels)
@@ -311,10 +317,10 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
                 eval_inputs = eval_inputs.to(device)
                 eval_labels = eval_labels.to(device)
 
-                preds = model(eval_inputs)
+                preds = model(eval_inputs) if not multi_view else multi_views_model(model,eval_inputs)
 
                 if isinstance(criterion,nn.BCEWithLogitsLoss): #special handling for BCE
-                    preds=torch.squeeze(preds)
+                    preds=torch.squeeze(preds,-1)
                     pred_logits=torch.zeros(eval_labels.size())
                     pred_logits[nn.functional.sigmoid(preds.detach().cpu())>0.5]=1
                     eval_labels=eval_labels.float()
@@ -347,21 +353,22 @@ def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, c
         if lr_sched is not None:
             lr_sched.step()
         #save the model after eval and verify loss dropped:
-        #only save the model when it performs better than prev eval loss
-        # if eval_acc_log[-1]>best_eval_acc:
-        #     best_eval_acc=eval_acc_log[-1]
-        #     saved_path=os.path.join(save_path, "best_model.pth")
-        #     torch.save(model.state_dict(), saved_path)
-        #     print('Model saved in {}'.format(saved_path))
-        #     print(f'the model saved obtained in ep {ep+1}')
         
         #to save multiple model for ensembles only on specific ep intervals for cosine warm up lr sched
-        
-        if (ep+1)% (T_0+last_restart)==0:
-            save_multi_models.check_best_n(eval_accuracy,model,ep)
-            if T_mul!=1:
-                last_restart+=T_0
-                T_0*=T_mul
+        if save_multiples==True:
+            if (ep+1)% (T_0+last_restart)==0:
+                save_multi_models.check_best_n(eval_accuracy,model,ep)
+                if T_mul!=1:
+                    last_restart+=T_0
+                    T_0*=T_mul
+        #only save the model when it performs better than prev eval loss
+        else:
+            if eval_acc_log[-1]>best_eval_acc:
+                best_eval_acc=eval_acc_log[-1]
+                saved_path=os.path.join(save_path, "best_model.pth")
+                torch.save(model.state_dict(), saved_path)
+                print('Model saved in {}'.format(saved_path))
+                print(f'the model saved obtained in ep {ep+1}')
             
         plot_graph(train_loss_log,train_acc_log,eval_loss_log,eval_acc_log)
         #to plot graph for the learning rate and loss relationship
@@ -384,13 +391,13 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
         optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,lr=lr, weight_decay=weight_decay)
 
     #exponential LR rate
-    # lower_bound=6.67e-7
-    # upper_bound=lr
-    # gamma=np.exp(np.log(lower_bound/upper_bound)/ep)
-    # lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
-    # print("the lr would increment by step with {}".format(gamma))
+    lower_bound=eta_min
+    upper_bound=lr
+    gamma=np.exp(np.log(lower_bound/upper_bound)/ep)
+    lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
+    print("the lr would increment by step with {}".format(gamma))
 
-    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mul, eta_min=eta_min,last_epoch=-1)
+    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mul, eta_min=eta_min,last_epoch=-1)
 
     #this is to find the best initial learning rate
     # lower_bound=1e-7
@@ -414,31 +421,33 @@ if __name__ == "__main__":
     loss_fnc="bce" 
     pretrain_pth='./vivit_model.pth'
     custom_weights=None #'./best_model.pth'
-    ep=160
+    ep=120
     clip_value=1 # 0 for disabling grad clip by value
-    lr=1.5e-4 
+    lr=5e-6
     freeze=False
 
     #overfitting control
-    noise=0.1 # upperbound for noise prob
+    noise=0.2 # upperbound for noise prob
     auto_augment=False
-    weight_decay=0.2 #0.05 for original
-    drop_out=0.5 #i.e. transform layer drop out only
-    aug_size=4
-    frame_interval=8 #tune samller for more randomness in temproal sampling
+    weight_decay=0.1 #0.05 for original
+    drop_out=0 #i.e. transfo4rm layer drop out only
+    aug_size=3
+    frame_interval=8 #tune samller for more randomness in temproal sampling; no use for multi views options
     temporal_random=True
     batch_size=4
     input_batchNorm=True
     num_frames=16 #strictly unchageable
+    frames_limit=32 #the total frames that the model would take for one video data for multi views options
+    multi_view=True #whether using multi-view training or inference
 
     #optimizer and lr sched
-    options="adam"
+    options="sgd"
     momentum=0.9 #for SGD only 
     nesterov=True #for SGD only
-    T_0=10 # optim in ep wise  for cosine warmup only
-    eta_min=1e-7 # optim in ep wise  for cosine warmup only
-    T_mul=2
-    #lr_sched=None
+    T_0=20 # optim in ep wise  for cosine warmup only
+    eta_min=1e-8 # optim in ep wise  for cosine warmup only
+    T_mul=1
+    save_multiples=True
 
     experiment= wandb.init(project='ViVit_Dog_SGD',resume='allow', anonymous='allow')
     experiment.config.update(dict(
@@ -474,7 +483,8 @@ if __name__ == "__main__":
                                               aug_size=aug_size,
                                               frame_interval=frame_interval,
                                               num_frames=num_frames,
-                                              temporal_random=temporal_random)
+                                              temporal_random=temporal_random,
+                                              all_frames=frames_limit)
     # load them to Data Loader
     train_DataLoader, val_DataLoader = load_DataLoader(train_dataset, val_dataset, batch_size=batch_size)
 
@@ -504,9 +514,11 @@ if __name__ == "__main__":
                                                                             criterion, 
                                                                             PATH,
                                                                             clip_value, 
-                                                                            step_log=10,
+                                                                            step_log=1000,
                                                                             T_0=T_0,
-                                                                            T_mul=T_mul
+                                                                            T_mul=T_mul,
+                                                                            multi_view=multi_view,
+                                                                            save_multiples=save_multiples
                                                                             )
 
     #plotting

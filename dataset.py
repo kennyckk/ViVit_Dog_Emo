@@ -173,14 +173,15 @@ class DogDataset(torch.utils.data.Dataset):
 				 num_samples_per_cls=60,
 				 num_class=2,
 				 transform=None,
-				 temporal_sample=None):
+				 temporal_sample=None,
+				 all_frames=None):
 		#self.configs = configs
 		self.num_class=num_class
 		self.num_frames=num_frames
 		self.num_samples_per_cls=num_samples_per_cls
 		self.annotation_path = annotation_path
 		self.data = load_annotations_dog(self.annotation_path, self.num_class, self.num_samples_per_cls)
-
+		self.all_frames=all_frames
 
 		self.transform = transform
 		self.temporal_sample = temporal_sample
@@ -196,13 +197,32 @@ class DogDataset(torch.utils.data.Dataset):
 				v_reader = self.v_decoder(path)
 				total_frames = len(v_reader)
 
-				# Sampling video frames
-				start_frame_ind, end_frame_ind = self.temporal_sample(total_frames)
-				assert end_frame_ind - start_frame_ind >= self.target_video_len
-				frame_indice = np.linspace(start_frame_ind, end_frame_ind - 1, self.target_video_len, dtype=int)
-				video = v_reader.get_batch(frame_indice).asnumpy()
+				if self.all_frames is None:
+					# Sampling video frames
+					start_frame_ind, end_frame_ind = self.temporal_sample(total_frames)
+					assert end_frame_ind - start_frame_ind >= self.target_video_len
+					frame_indice = np.linspace(start_frame_ind, end_frame_ind - 1, self.target_video_len, dtype=int)
+					video = v_reader.get_batch(frame_indice).asnumpy()
+					
+				else:
+					#this is to get all frames from the video up to max length defined
+					if total_frames>self.all_frames:#just get the max length that can be taken
+						frame_indice=np.linspace(0,self.all_frames-1,self.all_frames,dtype=int)
+						video=v_reader.get_batch(frame_indice).asnumpy()
+						#print('the video is over specified frames', video.shape)
+						
+					else: # will need to pad the rest of the frames
+						frame_indice=np.linspace(0,total_frames-1,total_frames,dtype=int)
+						video=v_reader.get_batch(frame_indice).asnumpy() #in numpy array T,H,W,C
+						v_shape=video.shape
+						#print('the video is under specified frames', v_shape)
+						pad_shape=(self.all_frames-total_frames,v_shape[1],v_shape[2],v_shape[3]) #prepare a shape for the pads
+						pads=np.zeros(pad_shape)
+
+						video=np.concatenate((video,pads),axis=0)
+						#print('the video is under specified frames', video.shape)
 				del v_reader
-				break
+				break		
 			except Exception as e:
 				print(e, 'skipping this data instance')
 				#index = random.randint(0, len(self.data) - 1)
@@ -416,12 +436,13 @@ if __name__=="__main__":
 	# 				std= (0.225, 0.225, 0.225))
 
 
-	sample_videos=DogDataset('./face_data/train.csv',
+	sample_videos=DogDataset('./face_data/eval.csv',
 				 num_frames=16,
 				 num_samples_per_cls=60,
 				 num_class=2,
 				 transform=transform,
-				 temporal_sample=train_temporal_sample)
+				 temporal_sample=train_temporal_sample,
+				 all_frames=256)
 
 	sample=next(iter(sample_videos))[0]
 	#print(sample)

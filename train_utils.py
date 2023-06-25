@@ -1,7 +1,5 @@
 import torch
-import numpy as np
 import os
-import shutil
 
 class Save_Multi_Models(object):
     def __init__(self,save_path,best_n=3):
@@ -41,7 +39,16 @@ class Save_Multi_Models(object):
             f.write('\n')
             f.writelines(eps)
 
+def multi_views_model(model,inputs):
+    #the inputs would be B,T,C,H,W--> BT',16,C,H,W
+    shape=inputs.size()
+    inputs=inputs.reshape(-1,16,shape[2],shape[3],shape[4])
 
+    output=model(inputs) # (BT',1) logits
+    output=output.reshape(shape[0],-1,1)
+    output= torch.mean(output, dim=1)
+    #print(output.size())
+    return output
 
         
         

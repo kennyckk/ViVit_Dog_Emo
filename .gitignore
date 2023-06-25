@@ -2,7 +2,7 @@ __pycache__/
 notebook/.ipynb_checkpoints/
 vivit_model.pth
 .idea/
-data
+data/videos
 test.py
 lightning_logs/
 saved_model/
