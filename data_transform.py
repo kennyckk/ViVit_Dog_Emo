@@ -709,8 +709,8 @@ def transforms_train_dog(img_size=224,
 		secondary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
 		### to add rotation 
 		secondary_tfl+=[Custom_Rotation((-180,180),prob=rotate)] #rotation 
-		# add translation
-		secondary_tfl+=[transforms.RandomApply(torch.nn.ModuleList([transforms.RandomAffine(0,(0.2,0.2))]),p=hflip)]
+		# add translation/rescale
+		secondary_tfl+=[transforms.RandomApply(torch.nn.ModuleList([transforms.RandomAffine(0,(0.2,0.2),scale=(0.7,1.3))]),p=hflip)]
 		# add Gaussian Blur
 		secondary_tfl+=[transforms.RandomApply(torch.nn.ModuleList([transforms.GaussianBlur((3,3),(0.1,1))]),p=noise)]
 		
@@ -731,7 +731,7 @@ def transforms_train_dog(img_size=224,
 		secondary_tfl += [transforms.ColorJitter(*color_jitter)]
 
 	# center crop as necessary step to crop image 
-	secondary_tfl+=[transforms.CenterCrop(img_size)]
+	secondary_tfl+=[transforms.RandomCrop(img_size)] #[transforms.CenterCrop(img_size)]
 
 	final_tfl = []
 	final_tfl += [

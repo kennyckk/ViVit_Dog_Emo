@@ -9,7 +9,7 @@ from train_utils import multi_views_model
 
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def load_model(path,pretrain_pth=None,num_class=1,num_frames=16,input_batchNorm=False ):
+def load_model(path,pretrain_pth=None,num_class=1,num_frames=16,input_batchNorm=True ):
 
     vivit = ViViT(pretrain_pth=pretrain_pth, weights_from=None,
                   img_size=224,
@@ -32,6 +32,7 @@ def load_model(path,pretrain_pth=None,num_class=1,num_frames=16,input_batchNorm=
 
 def eval(model,val_loader,criterion,multi_view=False):
     '''return logits predicted from each batch for each model'''
+    f1_score=F1_score()
     model.eval()
     eval_correct, eval_total, eval_loss = 0, 0, 0
     logits_batches=[]
@@ -56,6 +57,7 @@ def eval(model,val_loader,criterion,multi_view=False):
 
             eval_loss += criterion(preds, eval_labels).item()
             eval_labels = eval_labels.cpu()
+            f1_score.record(pred_logits,eval_labels)
             eval_correct += torch.sum(pred_logits == eval_labels).item()
             eval_total += eval_labels.size(0)
 
@@ -64,6 +66,7 @@ def eval(model,val_loader,criterion,multi_view=False):
             labels.append(eval_labels)
     eval_accuracy = eval_correct / eval_total
     
+    f1_score.calculate()
     print("individual model eval accuracy:{}; total eval loss:{}".format(eval_accuracy, eval_loss))
     return torch.cat(logits_batches), torch.cat(labels)
 
@@ -85,10 +88,45 @@ def load_eval_loader(path,batch_size,num_workers=0,all_frames=16):
                                            collate_fn=skip_bad_collate )
     return val_DataLoader
     
+class F1_score(object):
+    def __init__(self):
+        self.logits_batch=[]
+        self.labels_batch=[]
+        self.F1_score=[]
     
+    def record(self,pred_logits,eval_labels):
+        self.logits_batch.append(pred_logits)
+        self.labels_batch.append(eval_labels)
+
+    def calculate(self):
+        labels=torch.cat(self.labels_batch)
+        logits=torch.cat(self.logits_batch)
+        print(labels.size(),logits.size())
+        unique_cls= torch.unique(labels)
+        for cls in unique_cls:
+            cls_num=labels[labels==cls].size(0)
+            correct=torch.sum(logits[labels==cls]==cls).item()
+            F1_score_cls=correct/cls_num
+            print(f"the F1 score for this class {cls} is:",F1_score_cls)
+            self.F1_score.append(F1_score_cls)
+        print("the F1 Score is:",sum(self.F1_score)/len(self.F1_score))
+
+def multi_model_scores(avg_logits, labels):
+    #print(avg_logits)
+    predictions=torch.zeros_like(avg_logits)
+    #print(torch.nn.functional.sigmoid(avg_logits))
+    predictions[torch.nn.functional.sigmoid(avg_logits)>0.5]=1
+    corret=torch.sum(predictions==labels)
+    accuracy=corret/labels.size(0)
+
+    f1_score=F1_score()
+    f1_score.record(predictions,labels)
+    f1_score.calculate()
+    print('the ensembles accuracy is {}'.format(accuracy))
 
 def ensembles_eval(save_path,val_loader,all_frames=16):
-    multi_view=True if all_frames>16 else False
+    all_frames=0 if all_frames is None else all_frames
+    multi_view=True if all_frames>=16 else False
     model_weights= os.listdir(save_path) #a list of trained weights.pth
     criterion = torch.nn.BCEWithLogitsLoss()
     all_logits=[]
@@ -99,19 +137,23 @@ def ensembles_eval(save_path,val_loader,all_frames=16):
         print(f"model{idx} sucessfully loaded")
         logits, labels=eval(model,val_loader,criterion,multi_view=multi_view)
         all_logits.append(logits)
-    
-    avg_logits=torch.sum(torch.stack(all_logits),dim=0) #torch.mean(torch.stack(all_logits),dim=0)
-    #print(avg_logits)
-    predictions=torch.zeros_like(avg_logits)
-    predictions[torch.nn.functional.sigmoid(avg_logits)>0.5]=1
-    corret=torch.sum(predictions==labels)
-    accuracy=corret/labels.size(0)
-    print('the ensembles accuracy is {}'.format(accuracy))
+        #print(torch.nn.functional.sigmoid(logits))
+
+    avg_logits=torch.sum(torch.stack(all_logits),dim=0) #combine logits from ensemble models
+    multi_model_scores(avg_logits,labels)
+    return avg_logits,labels
     
 if __name__=="__main__":
-    all_frames=48
-    val_loader=load_eval_loader('./face_data/eval.csv',4,all_frames=all_frames)
-    ensembles_eval('saved_model/',val_loader,all_frames=all_frames)
+    all_frames=[None,80] #single or list 
+    dir=['saved_model/16/','saved_model/48/']
+    logits=[]
+    for id,case in enumerate(all_frames):
+        val_loader=load_eval_loader('./face_data/eval.csv',4,all_frames=case)
+        avg_logits,labels=ensembles_eval(dir[id],val_loader,all_frames=case)
+        logits.append(avg_logits)
+    print(len(logits))
+    logits=torch.sum(torch.stack(logits),dim=0)
+    multi_model_scores(logits,labels)
 
     
 

@@ -55,15 +55,18 @@ def load_model(pretrain_pth, custom_weights=None,num_class=2,drop_out=0.2,freeze
     cls_head = ClassificationHead(num_classes=num_class, in_channels=768)
     modules=[vivit,cls_head]
     modules=nn.Sequential(*modules)
-    if custom_weights:
-        missing, unexpected=modules.load_state_dict(torch.load(custom_weights),strict=False)
-        print("missing keys:{}, unexpected:{}".format(missing,unexpected))
+    # if custom_weights:
+    #     missing, unexpected=modules.load_state_dict(torch.load(custom_weights),strict=False)
+    #     print("missing keys:{}, unexpected:{}".format(missing,unexpected))
     
     if input_batchNorm:#activate for input normalization along temporal axis
         modules=[nn.BatchNorm3d(num_frames)]+[modules]
         modules = nn.Sequential(*modules)
 
     model=modules
+    if custom_weights:
+        missing, unexpected=model.load_state_dict(torch.load(custom_weights),strict=False)
+        print("missing keys:{}, unexpected:{}".format(missing,unexpected))
 
     return model.to(device)
 
@@ -215,7 +218,7 @@ def plot_lr_loss(lr_rate, batchwise_loss):
     fig.savefig('./lr_loss.jpg')
 
 def training_loop(model, train_loader, val_loader, epochs, optimizer,lr_sched, criterion, save_path,clip_value, step_log=10,T_0=None,T_mul=1,
-multi_view=True,save_multiples=False):
+multi_view=True,save_multiples='best_n'):
     # may add accelerator ....
 
     progress_bar = tqdm(range(epochs * len(train_loader)))
@@ -355,12 +358,14 @@ multi_view=True,save_multiples=False):
         #save the model after eval and verify loss dropped:
         
         #to save multiple model for ensembles only on specific ep intervals for cosine warm up lr sched
-        if save_multiples==True:
+        if save_multiples=='restart':
             if (ep+1)% (T_0+last_restart)==0:
                 save_multi_models.check_best_n(eval_accuracy,model,ep)
                 if T_mul!=1:
                     last_restart+=T_0
                     T_0*=T_mul
+        elif save_multiples=="best_n":
+            save_multi_models.check_best_n(eval_accuracy,model,ep)
         #only save the model when it performs better than prev eval loss
         else:
             if eval_acc_log[-1]>best_eval_acc:
@@ -390,14 +395,14 @@ def optimizer_options(option,lr,parameters,momentum=0.9 ,#for SGD only
     else:
         optimizer = optim.SGD(parameters, momentum=momentum, nesterov=nesterov,lr=lr, weight_decay=weight_decay)
 
-    #exponential LR rate
-    lower_bound=eta_min
-    upper_bound=lr
-    gamma=np.exp(np.log(lower_bound/upper_bound)/ep)
-    lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
-    print("the lr would increment by step with {}".format(gamma))
+    # #exponential LR rate
+    # lower_bound=eta_min
+    # upper_bound=lr
+    # gamma=np.exp(np.log(lower_bound/upper_bound)/ep)
+    # lr_sched =optim.lr_scheduler.ExponentialLR(optimizer,gamma=gamma,verbose=True)
+    # print("the lr would increment by step with {}".format(gamma))
 
-    #lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mul, eta_min=eta_min,last_epoch=-1)
+    lr_sched = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mul, eta_min=eta_min,last_epoch=-1)
 
     #this is to find the best initial learning rate
     # lower_bound=1e-7
@@ -419,8 +424,8 @@ if __name__ == "__main__":
 
     # Basic Hyperparameters
     loss_fnc="bce" 
-    pretrain_pth='./vivit_model.pth'
-    custom_weights=None #'./best_model.pth'
+    pretrain_pth=None#'./vivit_model.pth'
+    custom_weights='./continue.pth'
     ep=120
     clip_value=1 # 0 for disabling grad clip by value
     lr=5e-6
@@ -445,27 +450,27 @@ if __name__ == "__main__":
     momentum=0.9 #for SGD only 
     nesterov=True #for SGD only
     T_0=20 # optim in ep wise  for cosine warmup only
-    eta_min=1e-8 # optim in ep wise  for cosine warmup only
+    eta_min=1e-7 # optim in ep wise  for cosine warmup only
     T_mul=1
-    save_multiples=True
+    save_multiples='best_n'
 
     experiment= wandb.init(project='ViVit_Dog_SGD',resume='allow', anonymous='allow')
     experiment.config.update(dict(
-        ep=80,
-        lr=2e-3,
-        noise=0.1, # upperbound for noise prob
-        weight_decay=0.2, #0.05 for original
-        drop_out=0.5, #i.e. transform layer drop out only
-        aug_size=3,
-        frame_interval=8, #tune samller for more randomness in temproal sampling
-        temporal_random=True,
-        batch_size=4,
-        input_batchNorm=True,
-        optimizer="sgd",
-        momentum=0.9, #for SGD only 
-        nesterov=True, #for SGD only
-        T_0=20, # optim in ep wise  for cosine warmup only
-        eta_min=1e-5 # optim in ep wise  for cosine warmup only
+        ep=ep,
+        lr=lr,
+        noise=noise, # upperbound for noise prob
+        weight_decay=weight_decay, #0.05 for original
+        drop_out=drop_out, #i.e. transform layer drop out only
+        aug_size=aug_size,
+        frame_interval=frame_interval, #tune samller for more randomness in temproal sampling
+        temporal_random=temporal_random,
+        batch_size=batch_size,
+        input_batchNorm=input_batchNorm,
+        optimizer=options,
+        momentum=momentum, #for SGD only 
+        nesterov=nesterov, #for SGD only
+        T_0=T_0, # optim in ep wise  for cosine warmup only
+        eta_min=eta_min # optim in ep wise  for cosine warmup only
         #lr_sched=None
     ))
 

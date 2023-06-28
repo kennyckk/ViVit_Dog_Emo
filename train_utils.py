@@ -45,7 +45,7 @@ def multi_views_model(model,inputs):
     inputs=inputs.reshape(-1,16,shape[2],shape[3],shape[4])
 
     output=model(inputs) # (BT',1) logits
-    output=output.reshape(shape[0],-1,1)
+    output=output.reshape(shape[0],-1,1) 
     output= torch.mean(output, dim=1)
     #print(output.size())
     return output
