@@ -11,3 +11,4 @@ dummies/
 best_model.pth
 data_test/
 find_initialLR.py
+final_model/

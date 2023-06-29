@@ -948,26 +948,6 @@ def parse_args():
 	return args
 
 if __name__ == '__main__':
-	# Unit test for model runnable experiment and Hog prediction
-	import random
-	import numpy as np
-	#from mask_generator import CubeMaskGenerator
-	import data_transform as T
-	from dataset import DecordInit, extract_hog_features, temporal_sampling, denormalize, show_processed_image
-	#from skimage import io, draw
-	#from skimage.feature import _hoghistogram
-	#from torchvision.transforms import ToPILImage
-	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-	
-	model = MaskFeat(pool_q_stride_size=[[1, 1, 2, 2], [3, 1, 2, 2]], feature_dim=2*2*2*3*9)
-	for name, param in model.decoder_pred.named_parameters():
-		param.requires_grad = False
-	from optimizer import build_optimizer
-	import argparse
-	hparams = parse_args()
-	optimizer = build_optimizer(hparams, model, is_pretrain=False)
-	print(optimizer)
-	
 	'''
 	model = TimeSformer(num_frames=4,
 						img_size=224,

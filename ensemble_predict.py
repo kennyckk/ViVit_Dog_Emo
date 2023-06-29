@@ -142,18 +142,28 @@ def ensembles_eval(save_path,val_loader,all_frames=16):
     avg_logits=torch.sum(torch.stack(all_logits),dim=0) #combine logits from ensemble models
     multi_model_scores(avg_logits,labels)
     return avg_logits,labels
-    
-if __name__=="__main__":
-    all_frames=[None,80] #single or list 
-    dir=['saved_model/16/','saved_model/48/']
-    logits=[]
-    for id,case in enumerate(all_frames):
-        val_loader=load_eval_loader('./face_data/eval.csv',4,all_frames=case)
-        avg_logits,labels=ensembles_eval(dir[id],val_loader,all_frames=case)
+
+def inference(mode):
+    if mode=='average':
+        all_frames=[32]
+        dir=['final_model/average/']
+    else:
+        all_frames = [None, 80]
+        dir = ['final_model/maximum/16/', 'final_model/maximum/80/']
+
+    logits = []
+    for id, case in enumerate(all_frames):
+        val_loader = load_eval_loader('./face_data/eval.csv', 1, all_frames=case)
+        avg_logits, labels = ensembles_eval(dir[id], val_loader, all_frames=case)
         logits.append(avg_logits)
-    print(len(logits))
-    logits=torch.sum(torch.stack(logits),dim=0)
-    multi_model_scores(logits,labels)
+    logits = torch.sum(torch.stack(logits), dim=0)
+    multi_model_scores(logits, labels)
+
+
+if __name__=="__main__":
+    mode='average' #average or maximum
+
+    inference(mode)
 
     
 

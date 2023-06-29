@@ -424,8 +424,8 @@ if __name__ == "__main__":
 
     # Basic Hyperparameters
     loss_fnc="bce" 
-    pretrain_pth=None#'./vivit_model.pth'
-    custom_weights='./continue.pth'
+    pretrain_pth='./vivit_model.pth'
+    custom_weights=None #'./continue.pth'
     ep=120
     clip_value=1 # 0 for disabling grad clip by value
     lr=5e-6
@@ -436,7 +436,7 @@ if __name__ == "__main__":
     auto_augment=False
     weight_decay=0.1 #0.05 for original
     drop_out=0 #i.e. transfo4rm layer drop out only
-    aug_size=3
+    aug_size=1
     frame_interval=8 #tune samller for more randomness in temproal sampling; no use for multi views options
     temporal_random=True
     batch_size=4
