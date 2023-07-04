@@ -3,8 +3,9 @@ from tqdm import tqdm
 import cv2
 import shutil
 import re
-
-from .detect import run
+import sys
+print(sys.path)
+from detect import run
     
 #function to crop the face of dog from videos
 def crop_videos(video_path,
@@ -49,7 +50,7 @@ def crop_videos(video_path,
        
 #function to join the cropped frames back to video
 
-def join_frames(h_out,w_out, frames_loc,target_folder,video_name, video_path, frame_rate=30):
+def join_frames(h_out,w_out, frames_loc,target_folder,old_video_name,new_video_name, video_path, frame_rate=30):
     dim=(int(w_out),int(h_out)) #set up the output dimension of the videos
     
     try:
@@ -60,7 +61,7 @@ def join_frames(h_out,w_out, frames_loc,target_folder,video_name, video_path, fr
         frame_list= sorted(frame_list,key=lambda x: int(re.sub('\D',"",x)))# must sort the list since the frames order could be shuffled up
         
         # initiate cv2 video wirter
-        writer=cv2.VideoWriter(os.path.join(target_folder,video_name),cv2.VideoWriter_fourcc(*'X264'),frame_rate, dim)
+        writer=cv2.VideoWriter(os.path.join(target_folder,new_video_name),cv2.VideoWriter_fourcc(*'X264'),frame_rate, dim)
         #loop all frames to resize and use writer to write them into a list
         for frame in frame_list:
             curr_frame=cv2.imread(os.path.join(frames_loc,frame))
@@ -73,8 +74,8 @@ def join_frames(h_out,w_out, frames_loc,target_folder,video_name, video_path, fr
     
     except FileNotFoundError:
         #no cropping found, and just copy the original video
-        to_copy=os.path.join(video_path,video_name)
-        shutil.copy(to_copy,os.path.join(target_folder,video_name))
+        to_copy=os.path.join(video_path,old_video_name)
+        shutil.copy(to_copy,os.path.join(target_folder,new_video_name))
 
         
 def shorten_width(raw_video_folder, target_folder, crop_ratio=0.8):
@@ -125,40 +126,72 @@ def show_frames (video_path,sec=None):
         #print("the next frame:",ret)
         count+=1
 
-    
 
+def FCM_process(video_path,video_name):
+    """function to launch FCM for UI API"""
+    h_out, w_out = 384, 384  # this is for the cropped video dimesions
+    confidence_thres = 0.6
+    yolo_dim = (384, 384)  # this is for yolo inference
+
+    # yaml file path
+    data = './data/custom.yaml'
+    # trained model parameters
+    weight = '../final_model/fcm/best.pt'
+
+    # make a new folder to save the cropped videos
+    target_folder = os.path.join(video_path,'cropped_vids')
+    os.makedirs(target_folder,exist_ok=True)
+
+    try:
+        # to run the detect model per video, the output is the abs dir of the cropped images
+        frames_loc = crop_videos(video_path,
+                                 video_name,
+                                 weight,
+                                 data=data,
+                                 confidence_thres=confidence_thres,
+                                 target_folder=target_folder,
+                                 yolo_dim=yolo_dim)
+
+        # to join back all the cropped frames
+        join_frames(h_out, w_out, frames_loc, video_path, video_name,"fcm.mp4", video_path, frame_rate=30)
+    finally:
+        shutil.rmtree(target_folder)
+
+
+# if __name__== "__main__":
+#     # #here we define all hyperparameters to run the Yolo
+#     # h_out,w_out=384,384 #this is for the cropped video dimesions
+#     # confidence_thres=0.6
+#     # yolo_dim=(384,384) #this is for yolo inference
+#     # #yaml file path
+#     # data='./data/custom.yaml'
+#     # #trained model parameters
+#     # weight='./best.pt'
+#     # #make a new folder to save the cropped videos
+#     # target_folder='cropped_vids'
+#     # joined_folder='joined_vids'
+#     # os.makedirs('./'+target_folder,exist_ok=True)
+#     # os.makedirs('./'+joined_folder,exist_ok=True)
+#     #
+#     # video_path=os.path.join(os.getcwd(),"videos")
+#     # #first time run to shorten the width
+#     # #shorten_width("./raw_videos",video_path)
+#     #
+#     # video_list= os.listdir(video_path)
+#     #
+#     # #start scanning through all videos and crop them
+#     # for vid in tqdm(video_list):
+#     #     #to run the detect model per video
+#     #     frames_loc=crop_videos(video_path,
+#     #     vid,weight,
+#     #     data=data,
+#     #     confidence_thres=confidence_thres,
+#     #     target_folder=target_folder,
+#     #     yolo_dim=yolo_dim)
+#     #
+#     #     #to join back all the cropped frames
+#     #     join_frames(h_out,w_out, frames_loc,joined_folder,vid,vid, video_path,frame_rate=30)
+#       # show_frames('./raw_videos/c7f.mp4')
 if __name__== "__main__":
-    #here we define all hyperparameters to run the Yolo
-    h_out,w_out=384,384 #this is for the cropped video dimesions
-    confidence_thres=0.6
-    yolo_dim=(384,384) #this is for yolo inference
-    #yaml file path
-    data='./data/custom.yaml'
-    #trained model parameters
-    weight='./best.pt'
-    #make a new folder to save the cropped videos
-    target_folder='cropped_vids'
-    joined_folder='joined_vids'
-    os.makedirs('./'+target_folder,exist_ok=True)
-    os.makedirs('./'+joined_folder,exist_ok=True)
-
-    video_path=os.path.join(os.getcwd(),"videos")
-    #first time run to shorten the width
-    #shorten_width("./raw_videos",video_path)
-
-    video_list= os.listdir(video_path)
-    
-    #start scanning through all videos and crop them 
-    for vid in tqdm(video_list):
-        #to run the detect model per video
-        frames_loc=crop_videos(video_path,
-        vid,weight,
-        data=data,
-        confidence_thres=confidence_thres,
-        target_folder=target_folder,
-        yolo_dim=yolo_dim)
-
-        #to join back all the cropped frames
-        join_frames(h_out,w_out, frames_loc,joined_folder,vid, video_path,frame_rate=30)
-    
-    # show_frames('./raw_videos/c7f.mp4')
+    path=os.path.abspath('../static')
+    FCM_process(path, 'raw1.mp4')

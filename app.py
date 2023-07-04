@@ -2,7 +2,7 @@ from flask import Flask, render_template, request
 import os
 
 from ensemble_predict import inference
-import FCM.crop_videos
+
 
 app = Flask(__name__,static_folder='static')
 
@@ -18,7 +18,7 @@ def upload_video():
         video = request.files['video']
         # Save the video to a desired location or perform any other processing
         global raw_path
-        raw_path='./static/'+"raw.mp4"
+        raw_path='./static/'+"raw1.mp4"
         video.save(raw_path) #save the raw video
         # Render the template with the uploaded video
         return render_template('video.html',display=True)
