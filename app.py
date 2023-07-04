@@ -2,6 +2,7 @@ from flask import Flask, render_template, request
 import os
 
 from ensemble_predict import inference
+import FCM.crop_videos
 
 app = Flask(__name__,static_folder='static')
 

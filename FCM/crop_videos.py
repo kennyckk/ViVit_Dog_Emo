@@ -4,7 +4,7 @@ import cv2
 import shutil
 import re
 
-from detect import run
+from .detect import run
     
 #function to crop the face of dog from videos
 def crop_videos(video_path,
