@@ -12,23 +12,25 @@ class_map={0:"Negative Emotions: Sad or Angry", 1:"Positive Emotions: Happy or R
 @app.route('/', methods=['GET', 'POST'])
 def upload_video():
     if request.method == 'POST':
-        if not request.form.get("proceed_fam"):
-            # Handle the uploaded video
-            video = request.files['video']
-            # Save the video to a desired location or perform any other processing
-            global raw_path
-            raw_path='./static/'+"raw.mp4"
-            video.save(raw_path) #save the raw video
-            # Render the template with the uploaded video
-            return render_template('video.html',display=True)
 
-        elif request.form.get("proceed_fam"):
-            pred=inference(INFERENCE_MODE,os.path.abspath(raw_path) ,score=False)
-            prediction=class_map[pred]
-            return render_template('video.html',display=True, prediction=prediction)
+        # Handle the uploaded video
+        video = request.files['video']
+        # Save the video to a desired location or perform any other processing
+        global raw_path
+        raw_path='./static/'+"raw.mp4"
+        video.save(raw_path) #save the raw video
+        # Render the template with the uploaded video
+        return render_template('video.html',display=True)
 
     # If it's a GET request, render the upload form
     return render_template('video.html')
+
+@app.route('/process', methods=['POST'])
+def fam_process():
+    pred = inference(INFERENCE_MODE, os.path.abspath(raw_path), score=False)
+    prediction = class_map[pred]
+
+    return prediction
 
 if __name__ == '__main__':
     app.run(debug=True)

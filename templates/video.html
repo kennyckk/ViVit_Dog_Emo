@@ -2,13 +2,8 @@
 <html>
   <head>
     <title>Uploaded Video</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
-    <style>
-    .loading {
-      display: none;
-    }
-    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   </head>
   <body>
     <h1>Upload a Video</h1>
@@ -29,16 +24,58 @@
       >
         <source src="{{url_for('static',filename='raw.mp4')}}" type="video/mp4" />
       </video>
-      <form name="fam" method="POST" >
-          <input type="hidden" name="proceed_fam" value="True">
-          <input type="submit" value="Proceed FAM">
+
+
+      <form id="my-form">
+        <button id="process-button" type="submit">Proceed FAM</button>
       </form>
+
+      <div id="results-container" class="loading">
+        <!-- Results will be displayed here -->
+      </div>
+      <script>
+        function showLoading() {
+
+          $("#results-container").html("<h2>Model Inferring...</h2>");
+        }
+
+        function showResults(results) {
+          $("#results-container").html("<h2>Results:</h2><p>" + results + "</p>");
+        }
+
+        $(document).ready(function() {
+          $("#my-form").on("submit", function(e) {
+            e.preventDefault();
+
+
+            // Make an AJAX request to the Flask endpoint
+            $.ajax({
+              type: "POST",
+              url: "/process",
+              beforeSend: function() {
+                showLoading();
+              },
+              complete: function() {
+                $("#results-container").removeClass("loading");
+              },
+              success: function(response) {
+                showResults(response);
+              },
+              error: function(error) {
+                console.log(error);
+              }
+            });
+          });
+        });
+      </script>
     {% endif %}
 
-    {% if prediction %}
-    <p1> The Predicted Emotion of the Dog is {{prediction}}</p1>
-    {% endif %}
 
     <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+
+</body>
+</html>
+
+
   </body>
 </html>
