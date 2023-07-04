@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Uploaded Video</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
+    <style>
+    .loading {
+      display: none;
+    }
+    </style>
+  </head>
+  <body>
+    <h1>Upload a Video</h1>
+      <form method="POST" action="/" enctype="multipart/form-data">
+        <input type="file" name="video" accept="video/*">
+        <input type="submit" value="Upload">
+      </form>
+    {% if display %}
+      <video
+        id="my-video"
+        class="video-js"
+        controls
+        preload="auto"
+        width="640"
+        height="320"
+        poster="MY_VIDEO_POSTER.jpg"
+        data-setup="{}"
+      >
+        <source src="{{url_for('static',filename='raw.mp4')}}" type="video/mp4" />
+      </video>
+      <form name="fam" method="POST" >
+          <input type="hidden" name="proceed_fam" value="True">
+          <input type="submit" value="Proceed FAM">
+      </form>
+    {% endif %}
+
+    {% if prediction %}
+    <p1> The Predicted Emotion of the Dog is {{prediction}}</p1>
+    {% endif %}
+
+    <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+  </body>
+</html>
