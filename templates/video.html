@@ -11,7 +11,74 @@
         <input type="file" name="video" accept="video/*">
         <input type="submit" value="Upload">
       </form>
-    {% if display %}
+    {% if display1 %}
+      <video
+        id="my-video-raw"
+        class="video-js"
+        controls
+        preload="auto"
+        width="640"
+        height="320"
+        poster="MY_VIDEO_POSTER.jpg"
+        data-setup="{}"
+      >
+        <!-- this is for the raw original video-->
+        <source src="{{url_for('static',filename='raw.mp4')}}" type="video/mp4" />
+      </video>
+
+
+      <form id="my-form-fcm">
+        <button id="process-button-fcm" type="submit">Proceed FCM</button>
+      </form>
+
+      <div id="results-container-fcm" class="loading">
+        <!-- Results will be displayed here -->
+      </div>
+      <script>
+        function showLoading() {
+          $("#results-container-fcm").html("<h2>FCM in progress...</h2>");
+        }
+
+        function showResults(results) {
+          $("#results-container-fcm").html("<video
+                                              id="my-video-raw"
+                                              class="video-js"
+                                              controls
+                                              preload="auto"
+                                              width="640"
+                                              height="320"
+                                              poster="MY_VIDEO_POSTER.jpg"
+                                              data-setup="{}"
+                                            >
+                                               <source src="{{url_for('static',filename='fcm.mp4')}}" type="video/mp4" />
+                                             </video>");
+        }
+
+        $(document).ready(function() {
+          $("#my-form-fcm").on("submit", function(e) {
+            e.preventDefault();
+
+
+            // Make an AJAX request to the Flask endpoint
+            $.ajax({
+              type: "POST",
+              url: "/fcm_process",
+              beforeSend: function() {
+                showLoading();
+              },
+              success: function(response) {
+                showResults(response);
+              },
+              error: function(error) {
+                console.log(error);
+              }
+            });
+          });
+        });
+      </script>
+    {% endif %}
+
+    {% if display2 %}
       <video
         id="my-video"
         class="video-js"
@@ -51,7 +118,7 @@
             // Make an AJAX request to the Flask endpoint
             $.ajax({
               type: "POST",
-              url: "/process",
+              url: "/fam_process",
               beforeSend: function() {
                 showLoading();
               },
