@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Video Classifier</title>
+    <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  </head>
+  <body>
+  {% if not display %}
+      <h1>Dog Face Emotion Classifier </h1>
+      <h2>Raw Video </h2>
+      <video
+        id="my-video"
+        class="video-js"
+        controls
+        preload="auto"
+        width="640"
+        height="320"
+        poster="MY_VIDEO_POSTER.jpg"
+        data-setup="{}"
+      >
+        <source src="{{url_for('static',filename='raw1.mp4')}}" type="video/mp4" />
+      </video>
+      <form id="my-form-fcm">
+        <button id="process-button-fcm" type="submit">Proceed FCM</button>
+      </form>
+      <div id="results-container-fcm" class="loading">
+        <!-- Results will be displayed here -->
+      </div>
+  {% endif %}
+  {% if display %}
+        <h2>FCM Processed Video </h2>
+        <video
+        id="my-video-fcm"
+        class="video-js"
+        controls
+        preload="auto"
+        width="640"
+        height="320"
+        poster="MY_VIDEO_POSTER.jpg"
+        data-setup="{}"
+      >
+        <source src="{{url_for('static',filename='fcm.mp4')}}" type="video/mp4" />
+      </video>
+        <form id="my-form-fam">
+            <button id="process-button-fam" type="submit">Proceed FAM</button>
+        </form>
+        <div id="results-container-fam" >
+            <!-- Results will be displayed here -->
+        </div>
+  {% endif %}
+
+
+        <!-- Script for FCM -->
+      <script>
+        function showLoading1() {
+
+          $("#results-container-fcm").html("<h2>FCM in Progress...</h2>");
+        }
+
+        function showResults1(results) {
+          $("#results-container-fcm").html("<h2>Results:</h2><p>" + results + "</p>");
+        }
+
+        $(document).ready(function() {
+          $("#my-form-fcm").on("submit", function(e) {
+            e.preventDefault();
+
+
+            // Make an AJAX request to the Flask endpoint
+            $.ajax({
+              type: "POST",
+              url: "/fcm_process",
+              beforeSend: function() {
+                showLoading1();
+              },
+              complete: function() {
+                $("#results-container-fcm").removeClass("loading");
+              },
+              success: function(response) {
+                showResults1(response);
+              },
+              error: function(error) {
+                console.log(error);
+              }
+            });
+          });
+        });
+      </script>
+        <!--  Script for FAM -->
+      <script>
+            function showLoading() {
+
+              $("#results-container-fam").html("<h2>FAM in Progress...</h2>");
+            }
+
+            function showResults(results) {
+              $("#results-container-fam").html("<h2>Results:</h2><p>" + results + "</p>");
+            }
+
+            $(document).ready(function() {
+              $("#my-form-fam").on("submit", function(e) {
+                e.preventDefault();
+
+
+                // Make an AJAX request to the Flask endpoint
+                $.ajax({
+                  type: "POST",
+                  url: "/fam_process",
+                  beforeSend: function() {
+                    showLoading();
+                  },
+                  complete: function() {
+                    $("#results-container-fam").removeClass("loading");
+                  },
+                  success: function(response) {
+                    showResults(response);
+                  },
+                  error: function(error) {
+                    console.log(error);
+                  }
+                });
+              });
+            });
+          </script>
+
+
+    <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+
+</body>
+</html>
+
+
+  </body>
+</html>

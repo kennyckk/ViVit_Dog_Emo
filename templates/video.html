@@ -6,69 +6,13 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   </head>
   <body>
-    <h1>Upload a Video</h1>
+    <h1>Dog Face Emotion Classifier </h1>
+    <h2>Please Upload a random Video of a Dog</h2>
       <form method="POST" action="/" enctype="multipart/form-data">
         <input type="file" name="video" accept="video/*">
         <input type="submit" value="Upload">
       </form>
-    {% if display %}
-      <video
-        id="my-video"
-        class="video-js"
-        controls
-        preload="auto"
-        width="640"
-        height="320"
-        poster="MY_VIDEO_POSTER.jpg"
-        data-setup="{}"
-      >
-        <source src="{{url_for('static',filename='raw1.mp4')}}" type="video/mp4" />
-      </video>
 
-
-      <form id="my-form">
-        <button id="process-button" type="submit">Proceed FAM</button>
-      </form>
-
-      <div id="results-container" class="loading">
-        <!-- Results will be displayed here -->
-      </div>
-      <script>
-        function showLoading() {
-
-          $("#results-container").html("<h2>Model Inferring...</h2>");
-        }
-
-        function showResults(results) {
-          $("#results-container").html("<h2>Results:</h2><p>" + results + "</p>");
-        }
-
-        $(document).ready(function() {
-          $("#my-form").on("submit", function(e) {
-            e.preventDefault();
-
-
-            // Make an AJAX request to the Flask endpoint
-            $.ajax({
-              type: "POST",
-              url: "/process",
-              beforeSend: function() {
-                showLoading();
-              },
-              complete: function() {
-                $("#results-container").removeClass("loading");
-              },
-              success: function(response) {
-                showResults(response);
-              },
-              error: function(error) {
-                console.log(error);
-              }
-            });
-          });
-        });
-      </script>
-    {% endif %}
 
 
     <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>

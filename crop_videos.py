@@ -4,8 +4,8 @@ import cv2
 import shutil
 import re
 import sys
-print(sys.path)
-from detect import run
+
+from yolov5.detect import run
     
 #function to crop the face of dog from videos
 def crop_videos(video_path,
@@ -127,16 +127,11 @@ def show_frames (video_path,sec=None):
         count+=1
 
 
-def FCM_process(video_path,video_name):
+def FCM_process(video_path,video_name,data,weight):
     """function to launch FCM for UI API"""
     h_out, w_out = 384, 384  # this is for the cropped video dimesions
     confidence_thres = 0.6
     yolo_dim = (384, 384)  # this is for yolo inference
-
-    # yaml file path
-    data = './data/custom.yaml'
-    # trained model parameters
-    weight = '../final_model/fcm/best.pt'
 
     # make a new folder to save the cropped videos
     target_folder = os.path.join(video_path,'cropped_vids')
@@ -193,5 +188,9 @@ def FCM_process(video_path,video_name):
 #     #     join_frames(h_out,w_out, frames_loc,joined_folder,vid,vid, video_path,frame_rate=30)
 #       # show_frames('./raw_videos/c7f.mp4')
 if __name__== "__main__":
-    path=os.path.abspath('../static')
-    FCM_process(path, 'raw1.mp4')
+    #yaml file
+    config='./final_model/fcm/custom.yaml'
+    weight='./final_model/fcm/best.pt'
+
+    path=os.path.abspath('./static')
+    FCM_process(path, 'raw1.mp4',config,weight)

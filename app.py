@@ -2,11 +2,15 @@ from flask import Flask, render_template, request
 import os
 
 from ensemble_predict import inference
-
+from crop_videos import FCM_process
 
 app = Flask(__name__,static_folder='static')
 
+#FCM
+CONFIG='./final_model/fcm/custom.yaml'
+WEIGHT = './final_model/fcm/best.pt'
 
+# FAM Configuration
 INFERENCE_MODE="max"
 class_map={0:"Negative Emotions: Sad or Angry", 1:"Positive Emotions: Happy or Relaxed"}
 
@@ -21,17 +25,29 @@ def upload_video():
         raw_path='./static/'+"raw1.mp4"
         video.save(raw_path) #save the raw video
         # Render the template with the uploaded video
-        return render_template('video.html',display=True)
+        return render_template('system.html')
 
     # If it's a GET request, render the upload form
     return render_template('video.html')
 
-@app.route('/process', methods=['POST'])
+@app.route('/fam_process', methods=['POST'])
 def fam_process():
     pred = inference(INFERENCE_MODE, os.path.abspath(raw_path), score=False)
     prediction = class_map[pred]
 
     return prediction
+
+@app.route('/fcm', methods=['GET'])
+def fcm_page():
+    return render_template('system.html')
+
+@app.route('/fcm_process', methods=['POST'])
+def fcm_process():
+    video_name = raw_path.split('/')[-1]  # get the name of the mp4
+    video_path = os.path.abspath(os.path.join(raw_path, os.pardir))  # get abs path of the static folder
+    FCM_process(video_path, video_name, CONFIG, WEIGHT)
+
+    return render_template('system.html', display=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
