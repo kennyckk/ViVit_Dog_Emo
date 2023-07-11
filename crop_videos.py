@@ -148,7 +148,7 @@ def FCM_process(video_path,video_name,data,weight):
                                  yolo_dim=yolo_dim)
 
         # to join back all the cropped frames
-        join_frames(h_out, w_out, frames_loc, video_path, video_name,"fcm.mp4", video_path, frame_rate=30)
+        join_frames(h_out, w_out, frames_loc, video_path, video_name,"fcm_"+video_name, video_path, frame_rate=30)
     finally:
         shutil.rmtree(target_folder)
 

@@ -19,7 +19,7 @@
         poster="MY_VIDEO_POSTER.jpg"
         data-setup="{}"
       >
-        <source src="{{url_for('static',filename='raw1.mp4')}}" type="video/mp4" />
+        <source src="{{url_for('static',filename=filename)}}" type="video/mp4" />
       </video>
       <form id="my-form-fcm">
         <button id="process-button-fcm" type="submit">Proceed FCM</button>
@@ -40,7 +40,7 @@
         poster="MY_VIDEO_POSTER.jpg"
         data-setup="{}"
       >
-        <source src="{{url_for('static',filename='fcm.mp4')}}" type="video/mp4" />
+        <source src="{{url_for('static',filename=fcm_vid)}}" type="video/mp4" />
       </video>
         <form id="my-form-fam">
             <button id="process-button-fam" type="submit">Proceed FAM</button>
